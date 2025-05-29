@@ -21,6 +21,168 @@ import parsetables
 IsPrint = False
 
 """
+===============================================================================
+Test Class projtables.InterleavedColBlocksTbl
+===============================================================================
+"""
+@pytest.fixture
+def tbls(files):
+    """
+    Instance tbls and Promos Table
+    """
+    tbls = ProjectTables(files)
+
+    # Instance Promos Table with import and parse parameters
+    d = {'ftype':'excel', 'sht':'sheet1', 'import_path':files.path_data}
+    d['lst_files'] = 'interleaved_test_data.xlsx'
+    d2 = {'is_unstructured':True, 'parse_type':'interleaved_col_blocks', \
+        'n_cols_metadata':3, 'idx_start':1, 'n_cols_block':2}
+    tbls.Promos = Table('Promos', dImportParams=d, dParseParams=d2)
+    return tbls
+
+@pytest.fixture
+def parse_int(files, tbls):
+
+    # Import the Promos test data
+    tbls.Promos.ImportToTblDf()
+    
+    # Set .df_raw to simulate iteration through list of raw df's
+    tbls.Promos.df_raw = tbls.Promos.lst_dfs[0]
+
+    return parsetables.InterleavedColBlocksTbl(tbls.Promos)
+
+"""
+===============================================================================
+"""
+class TestInterleavedColBlocks:
+    def test_ParseInterleavedBlocksProcedure(self, parse_int):
+        """
+        Test - Procedure to parse interleaved blocks of columns
+        JDL 3/17/25
+        """
+        parse_int.ParseInterleavedBlocksProcedure()
+        if IsPrint: print('\n', parse_int.df)
+        assert len(parse_int.df) == 48
+
+    def test_TransferAllBlocks(self, parse_int):
+        """
+        Test - TransferAllBlocks method
+        """
+        parse_int.SetDfMetadata()
+        parse_int.DeleteTrailingRows()
+        parse_int.TransferAllBlocks()
+
+        # Check that .df has expected number of rows
+        assert len(parse_int.df) == 48
+        assert parse_int.df.loc[0, 'values'] == 500
+        assert parse_int.df.loc[47, 'values'] == 600
+
+    def test_ReadWriteBlock(self, parse_int):
+        """
+        Test - Read and write a block of columns to .df
+        JDL 3/17/25
+        """
+        parse_int.SetDfMetadata()
+        parse_int.DeleteTrailingRows()
+
+        # Set the current column index and call method
+        parse_int.idx_col_cur = 4
+        parse_int.ReadWriteBlock()
+
+        assert len(parse_int.df) == 24
+        assert parse_int.df.loc[0, 'Offer Group Name'] == 'Item 1'
+        assert parse_int.df.loc[11, 'Offer Group Name'] == 'Item 12'
+        assert parse_int.df.loc[23, 'Offer Group Name'] == 'Item 12'
+        assert parse_int.df.loc[0, 'block_name'] == '2021-12-27'
+        assert parse_int.df.loc[11, 'block_name'] == '2021-12-27'
+        assert parse_int.df.loc[23, 'block_name'] == '2021-12-27'
+        assert parse_int.df.loc[0, 'var_name'] == 'Total Units Redeemed'
+        assert parse_int.df.loc[11, 'var_name'] == 'Total Units Redeemed'
+        assert parse_int.df.loc[12, 'var_name'] == 'Redemption Budget Used'
+        assert parse_int.df.loc[23, 'var_name'] == 'Redemption Budget Used'
+        assert parse_int.df.loc[0, 'values'] == 500
+        assert parse_int.df.loc[11, 'values'] == 30
+        assert parse_int.df.loc[12, 'values'] == 5000
+        assert parse_int.df.loc[23, 'values'] == 300
+
+    def test_ReadWriteColData(self, parse_int):
+        """
+        Test - Transfer one column's data to .df by reading from a column block
+        JDL 3/17/25
+        """
+        parse_int.SetDfMetadata()
+        parse_int.DeleteTrailingRows()
+
+        # Set the current column index and block name
+        parse_int.idx_col_block_cur = 4
+        parse_int.block_name_cur = parse_int.df_raw.loc[0, parse_int.idx_col_block_cur]
+        parse_int.idx_col_cur = 4
+        parse_int.ReadWriteColData()
+
+        assert len(parse_int.df) == 12
+        assert parse_int.df.loc[0, 'Offer Group Name'] == 'Item 1'
+        assert parse_int.df.loc[11, 'Offer Group Name'] == 'Item 12'
+        assert parse_int.df.loc[0, 'block_name'] == '2021-12-27'
+        assert parse_int.df.loc[11, 'block_name'] == '2021-12-27'
+        assert parse_int.df.loc[0, 'var_name'] == 'Total Units Redeemed'
+        assert parse_int.df.loc[11, 'var_name'] == 'Total Units Redeemed'
+        assert parse_int.df.loc[0, 'values'] == 500
+        assert parse_int.df.loc[11, 'values'] == 30
+
+        # Increment to next column and re-run
+        parse_int.idx_col_cur = 5
+        parse_int.ReadWriteColData()
+        assert len(parse_int.df) == 24
+        assert parse_int.df.loc[12, 'var_name'] == 'Redemption Budget Used'
+        assert parse_int.df.loc[23, 'var_name'] == 'Redemption Budget Used'
+        assert parse_int.df.loc[12, 'values'] == 5000
+        assert parse_int.df.loc[23, 'values'] == 300
+
+        # Print the resulting DataFrame
+        if IsPrint:
+            print('\n', parse_int.df_raw)
+            print('\n', parse_int.df)
+
+    def test_DeleteTrailingRows(self, parse_int):
+        """
+        Delete trailing rows with blank metadata
+        JDL 3/17/25
+        """
+        parse_int.SetDfMetadata()
+        parse_int.DeleteTrailingRows()
+
+        assert len(parse_int.df_metadata) == 12
+        assert parse_int.df_metadata.loc[11, 'Offer Group Name'] == 'Item 12'
+        assert len(parse_int.df_raw) == 14
+        assert parse_int.df_raw.loc[13, 1] == 'Item 12'
+
+    def test_SetDfMetadata(self, parse_int):
+        """
+        Set .df_metadata as a subset of .df_raw
+        JDL 3/17/25
+        """
+        parse_int.SetDfMetadata()
+
+        # Check that .df_metadata columns and rows
+        cols = ['Offer Group Name', 'Platform Comparison', 'Retailer Name']
+
+        # Print the  metadata DataFrame
+        if IsPrint: print('\n', parse_int.df_metadata)
+
+        assert list(parse_int.df_metadata.columns) == cols
+        assert len(parse_int.df_metadata) == 13
+
+    def test_parse_int_fixture(self, parse_int):
+        """
+        Test - Import Excel raw interleaved data
+        JDL 3/17/25
+        """
+        # Print the raw DataFrame
+        if IsPrint: print('\n', parse_int.df_raw)
+
+        assert parse_int.df_raw.index.size == 15
+
+"""
 Stop 13:30 9/27/24
 Committed working code with block_id vars
 Ready to add mods to Stack procedure to account for block_id vars
@@ -532,7 +694,6 @@ JDL 9/27/24
 ================================================================================
 """
 class TestExtractBlockIDs:
-
     def test_blockids_ExtractBlockIDsProcedure1(self, row_maj_tbl1):
         """
         Procedure to extract block ID values from df_raw
