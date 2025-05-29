@@ -11,7 +11,7 @@ The toolbbox's emphasis on systematic management of metadata allows common tasks
 | `ProjectFiles` | `projfiles.py`     | `files`      | Stores standard and project-specific directory paths and file names. |
 | `ProjectTables`| `projtables.py`    | `tbls`       | Collection of `Table` objects and a DataFrame of table metadata, such as import and parsing instructions. |
 | `Table`        | `projtables.py`    | Custom names | Data and metadata about an individual table including its `df`, `dfRaw` (freshly imported/pre-parsing), and `dfColinfo` with metadata about individual variables. |
-| `ColumnInfo`   | `xxx.py`           | `col_info`   | DataFrame and methods for metadata about each table's variables, including renaming, variables to retain, and data types post-import. Also contains documentation about variables such as units and description. |
+| `ColumnInfo`   | `col_info.py`           | `col_info`   | DataFrame and methods for metadata about each table's variables, including renaming, variables to retain, and data types post-import. Also contains documentation about variables such as units and description. |
 | `ErrorHandling`| `error_handling.py`| `errs`       | Metadata and methods related to detecting and reporting errors. |
 | *N/A*          | `util_openpyxl.py` | *N/A*        | Utility functions for writing and formatting data in Microsoft Excel. |
 | *N/A*          | `import_classes.py` | *N/A*        | For efficient instancing of toolbox and project-specific classes |
