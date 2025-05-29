@@ -1,0 +1,122 @@
+***Project Background***
+We are developing Python code for a model that will be the class, ParseImports. The model imports and cleans sales and advertising data. The class will reside in the file, parse_fns.py (aka project_file.py below)
+
+* For each model use cases, we create one or more single-action methods that can be called in sequence by a "procedure" method that calls the single-action methods in order. 
+* The procedure method gets written after the single-action methods are written and validated. It precedes the set of single-action methods in the class.
+
+* We will also write at least one Pytest test for each class method. These will go in the separate file, test_parse_fns.py (aka test_project_file.py below)
+
+* We use this directory structure, so test.py files needs to add the libs folder path to sys.path before importing the class.
+
+    project_folder/
+    ├── libs/
+    │   └── project_file.py
+    └── tests/
+        ├── test_data_subfolder/
+        └── test_project_file.py
+
+    ```
+    # Add the project folder to sys.path and import project class modules
+    s = os.path.join(os.path.dirname(__file__), '..', 'libs')
+    sys.path.insert(0, os.path.abspath(s))
+    ```
+* In both the project and test files, we insert a docstring "fence" at the beginning of the class and beginning of fixtures and tests for the class.
+* We also insert a docstring fence to delimit each new procedure's code. These docstring fences look like the example below and should be indented to the level of other methods/tests
+* In the docstring fences, adjust the length of "===" accounting for indent spaces to conform to a 79-character line limit.
+
+    ```
+    """
+    =========================================================================
+    <Procedure name> Procedure <or Class ClassName>
+    =========================================================================
+    """
+    ```
+* In my prompts, variable names preceded by "." are class attributes
+* Counter to PEP, we use camelCase for method names and snake_case for variable names
+
+* Add a docstring to the methods in the format like this example. The docstring follows the method definition and is indented and enclosed in triple quotes:
+
+    ``` 
+    def ImportRawData(self):
+        """ 
+        Import raw data from a .csv file and create .df_raw DataFrame
+        2/18/25
+        """
+        ...
+    ```
+
+* The class has an __init__, and its test should be named test_init without double underscore. In general, newly-written methods should not be called from __init__ unless instructed otherwise.
+* the __init__ should initialize all newly-created class attributes as either None, an empty list or empty DataFrame depending on the attribute's type.
+* test names should generally match class method names or fixture names
+* If we have multiple tests for any class method, they will be test_MethodName1, test_MethodName2 etc.
+* To enable easy search in the files, tests should use identical docstrings as the methods they test with the exception of "Test - " at the beginning of the docstring. For example:
+
+    ```
+    # Method
+    def ImportRawData(self):
+        """
+        Import raw data from a .csv file and create .df_raw DataFrame
+        2/18/25
+        """
+        ...
+    ```
+
+    ```
+    # Test
+    def test_ImportRawData(self):
+        """
+        Test - Import raw data from a .csv file and create .df_raw DataFrame
+        2/18/25
+        """
+        ...
+    ```
+
+* Convert method and test-writing instructions to shorter comment strings. Do not comment excessively. It's ok to make compound comments. 
+* Do not ever include trailing comments in code lines. 
+* In comments, it's ok to abbreviate common code objects like df and cols for DataFrame and columns. 
+
+    Instead of this:
+    ```
+    # Check if the DataFrame has two rows
+    assert len(rl.df_raw) == 2, "DataFrame does not have two rows"
+
+    # Check the column names
+    assert list(rl.df_raw.columns) == ['length', 'diameter'], "Column names do not match"
+    ```
+    Do this:
+    ```
+    # Check if the df has two rows and check col names
+    assert len(rl.df_raw) == 2
+    assert list(rl.df_raw.columns) == ['length', 'diameter']
+    ```
+
+**Helper Classes**
+* We use two helper classes that are instanced by the calling test or production *.ipynb. These are instanced as fixtures in the test file. The classes are tbls and files, and they are passed to class methods as arguments when needed along with the self argument.
+* tbls is an instance of ProjectTables (projtables.py). Its attributes are projtables.Table objects whose attributes include the metadata about the table including a .df DataFrame attribute. We hard code initializing a tbls attribute for the major tables in the project.
+* files is an instance of Files (projfiles.py). Its attributes describe the location of input and output files.
+* files.path_xxx, files.file_xxx and files.pf_xxx are the directory path, file name and full path of the file, respectively. We use these attributes instead of hard coding paths and filenames in the code.
+* we use os.sep to construct paths with cross-platform compatibility.
+* We always append a trailing os.sep to directory paths.
+* For testing, we instance files with IsTest=True in a fixture so that .path_data points to the test_data_subfolder in the tests directory in the above folder structure.
+* For testing use the following pytest fixtures:
+
+    ```
+    from projfiles import Files
+    from projtables import ProjectTables
+
+    # files fixture
+    @pytest.fixture
+    def files():
+        files = Files(IsTest=True, subdir_tests="test_data_subfolder")
+        return files
+
+    # tbls fixture
+    @pytest.fixture
+    def tbls(files):
+        tbls = ProjectTables(files)
+        return tbls
+    ```
+
+**General Guidelines About Prompts**
+* We put all import statements at file beginning. As we develop methods and tests, repeat the file's complete set of import statements if they change do to new code. Do this in a separate code block in your response if you are also sharing new code.
+* When responding to prompts to write code, do not repeat previous code that is unchanged. Just respond with the new code or changes. To make pasting your responses easy, If the import statements change, repeat the complete set of import statements in a separate code block in your response. If the .__init__ method changes, output it in a separate code block too --separate from the import statements and any new method you are writing and outputting in its own code block.
