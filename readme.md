@@ -57,7 +57,7 @@ That code specifies how ExampleTbl1 data will be imported to its .df attribute. 
 * The `Table` class objects that are `tbls` attributes contain all metadata for a project table including its `.df` data and its `.name`. The latter is input as an argument in the example above, and a best practice is to name the table the same as its programmatic instance. Other attributes are `.dImportParams` and `.dParseParams` that describe how to import and parse data into `.df` for use in modeling and analysis. Data ingestion directly imports to `.df` for "structured" rows/columns raw data. If the data are unstructured but in a repeatable format, `ImportToTblDf` populates `Table.lst_dfs` with individual raw (unparsed) imported df's --enabling subesquent parsing and concatenation into `Table.df`.
 
 ---
-The following sections describe Table.ImportToTblDf() inputs for ingesting and parsing data using Table.dImportParams and .dParseParams dictionaries. .ImportToTblDf() acts differently if imported data are rows/cols that can be read with `pd.read_excel`, `pd.read_csv` etc. In this case, it concatenates all imported data directly into Table.df. If the data are unstructured (aka non rows/cols) it loads each imported sheet/file as a raw data DataFrame into Table.lst_dfs for subsequent parsing by calling Table.ParseRawData() This method bases its actions on dParseParams parameters describing how to rearrange the data and concatenate into Table.df.
+The following sections describe Table.ImportToTblDf() inputs for ingesting and parsing data using .dImportParams and .dParseParams dictionaries.
 
 ### 1. `dImportParams`
 This dictionary specifies import-related parameters.
