@@ -16,6 +16,7 @@ from projtables import ProjectTables
 from projtables import Table
 from projtables import RowMajorTbl
 from projtables import RowMajorBlockID
+import parsetables
 
 IsPrint = False
 
@@ -64,12 +65,10 @@ def dParseParams_tbl1_survey():
 def tbl1_survey(files, dParseParams_tbl1_survey):
     """
     Table object for survey data
-    JDL 9/25/24; Modified 4/21/25
+    JDL 9/25/24; Modified 5/29/25
     """
-    dImport = {'ftype':'excel',
-        'import_path':files.path_data,
-        'sht':'raw_table',
-        'lst_files':'tbl1_survey.xlsx'}
+    dImport = {'ftype':'excel', 'import_path':files.path_data,
+        'sht':'raw_table', 'lst_files':'tbl1_survey.xlsx'}
     tbl = Table('tbl1_survey', dImportParams=dImport, \
         dParseParams=dParseParams_tbl1_survey)
     tbl.ImportToTblDf()
@@ -81,7 +80,7 @@ def row_maj_tbl1_survey(tbl1_survey):
     Instance RowMajorTbl parsing class for survey data
     JDL 9/25/24
     """
-    return RowMajorTbl(tbl1_survey, df=tbl1_survey.lst_dfs[0])
+    return parsetables.RowMajorTbl(tbl1_survey, df=tbl1_survey.lst_dfs[0])
 
 """
 ================================================================================
@@ -337,7 +336,7 @@ def row_maj_tbl1(tbl1):
     (df argument simulates iteration df from .lst_dfs)
     JDL 9/26/24; Modified 4/21/25
     """
-    parse = RowMajorTbl(tbl1, df=tbl1.lst_dfs[0])
+    parse = parsetables.RowMajorTbl(tbl1, df=tbl1.lst_dfs[0])
     parse.tbl.import_col_map = \
             {'idx_raw':'idx', 'col #1':'col_1', 'col #2':'col_2'}
     parse.tbl.col_order = pd.Series(index=[0, 1, 2], data=['idx', 'col_2', 'col_1'])
@@ -523,7 +522,7 @@ class TestTbl1Fixtures:
         """
         assert files.path_data.split(os.sep)[-3:] == ['tests', 'test_data_parse', '']
         assert files.path_libs.split(os.sep)[-2:] == ['libs', '']
-        assert files.path_root.split(os.sep)[-2:] == ['Python_Col_Info', '']
+        assert files.path_root.split(os.sep)[-2:] == ['Python_ModelingToolbox', '']
         assert files.path_tests.split(os.sep)[-2:] == ['tests', '']
 
 """
