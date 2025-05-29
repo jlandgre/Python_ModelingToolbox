@@ -14,12 +14,24 @@ The toolbbox's emphasis on systematic management of metadata allows common tasks
 | `ColumnInfo`   | `xxx.py`           | `col_info`   | DataFrame and methods for metadata about each table's variables, including renaming, variables to retain, and data types post-import. Also contains documentation about variables such as units and description. |
 | `ErrorHandling`| `error_handling.py`| `errs`       | Metadata and methods related to detecting and reporting errors. |
 | *N/A*          | `util_openpyxl.py` | *N/A*        | Utility functions for writing and formatting data in Microsoft Excel. |
+| *N/A*          | `import_classes.py` | *N/A*        | For efficient instancing of toolbox and project-specific classes |
 
-## Project-Specific Classes
+## Project-Specific Class Internal Architecture
 
 Best practice project-specific class(es) are architected to divide code into "procedures," which are class methods comprising a step-by-step, linear recipe of calls of individual methods to complete a larger task. Example procedure tasks are a user-facing use case or an internal, multi-step subtask.
 
 Individual methods called by the procedures are single-action and are each validated by at least one Pytest test function in a separate file. Usually, project class methods have `tbls` and `errs` as arguments in addition to `self`.
+
+## Presenting A Clean User Interface for Models
+
+As a convenience and to present a clean user interface for running a model, `import_classes.py` can be customized to instance toolbox and project classes with a single statement and with customizable, hard-coded parameters out of view of the model's user. For example, it handles the detail that `files` can be instanced with IsTest=True in production mode or False to point to sandbox test data. The code snippet shows a Jupyter notebook cell from a project that instances toolbox classes and a project-specific `model` instance. It does this with minimal lines to avoid distracting the user from the business of running the model.
+
+```python
+# Import libraries and instance helper classes. This instances files, tbls and parse.
+import pandas as pd, numpy as np, datetime as dt
+from libs.import_classes import instance_project_classes
+files, tbls, model = instance_project_classes(IsParse=True)
+```
 
 J.D. Landgrebe,
 Data Delve LLC, May 2025
