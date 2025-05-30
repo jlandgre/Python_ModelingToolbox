@@ -14,15 +14,115 @@ if not path_libs in sys.path: sys.path.append(path_libs)
 from projfiles import Files
 from projtables import ProjectTables
 from projtables import Table
-from projtables import RowMajorTbl
-from projtables import RowMajorBlockID
 import parsetables
 
 IsPrint = False
 
 """
 ===============================================================================
-Test Class projtables.InterleavedColBlocksTbl
+Test Class projtables.Table.ParseRawData (JDL 5/30/25)
+The ParseRawData procedure operates on Table.lst_dfs created by .ImportToTblDf 
+when .is_unstructured=True. In this case, the import leaves the unparsed raw
+data as dfs in .lst_dfs. ParseRawData iterates through the list of raw dfs and
+applies the specified (.dParseParams['parse_type']) parsing procedure to each
+===============================================================================
+"""
+@pytest.fixture
+def tbls_both(files):
+    """
+    Instance tbls with Promos and Survey Tables
+    """
+    tbls_both = ProjectTables(files)
+
+    # Instance Promos Table with import and parse parameters
+    d = {'ftype':'excel', 'sht':'sheet1', 'import_path':files.path_data}
+    #d['lst_files'] = 'interleaved_test_data.xlsx'
+    d2 = {'is_unstructured':True, 
+        'import_dtype': str,
+        'parse_type':'InterleavedColBlocksTbl',
+        'n_cols_metadata':3, 
+        'idx_start':1, 
+        'n_cols_block':2}
+    tbls_both.Promos = Table('Promos', dImportParams=d, dParseParams=d2)
+
+    # Instance survey Table with import and parse parameters including block_id_var
+    d = {'ftype':'excel', 'import_path':files.path_data, 'sht':'raw_table'}
+    d2 = {'is_unstructured': True, 
+        'parse_type': 'RowMajorTbl', 
+        'import_dtype': str,
+        'flag_start_bound': 'Answer Choices',
+        'flag_end_bound': '<blank>',
+        'icol_start_bound': 0,
+        'icol_end_bound': 0,
+        'iheader_rowoffset_from_flag': 0,
+        'idata_rowoffset_from_flag': 1,
+        'block_id_vars': ('question_text', -2, 0)}
+    tbls_both.Survey = Table('tbl1_survey', dImportParams=d, dParseParams=d2)
+    return tbls_both
+
+class TestParseRawData:
+    def test_ParseRawData1(self, tbls_both):
+        """
+        ParseRawData for Promos Table (InterleavedColBlocksTbl)
+        JDL 5/30/25
+        """
+        # Import and parse the Promos test data
+        tbls_both.Promos.ImportToTblDf(lst_files='interleaved_test_data.xlsx')
+        tbls_both.Promos.ParseRawData()
+
+        # Check resulting .df
+        df = tbls_both.Promos.df
+        assert len(df) == 48
+
+        # Check Repeating blocks and sum of values from hand calculation
+        assert list(df['Offer Group Name']) == 4 *  [f'Item {i}' for i in range(1, 13)]
+        assert list(df['block_name']) == 24 * ['2021-12-27'] + 24 * ['2022-01-03']
+        assert list(df['var_name']) == \
+            2* (12 * ['Total Units Redeemed'] + 12 * ['Redemption Budget Used'])
+        assert df['values'].astype('float64').sum() == 63360.
+
+        if IsPrint:
+            print(f'\nRaw df\n{tbls_both.Promos.lst_dfs[0]}')
+            print(f'\nParsed df\n{tbls_both.Promos.df}\n\n')
+            print(tbls_both.Promos.df.info(), '\n')
+
+    def test_ParseRawData2(self, tbls_both):
+        """
+        ParseRawData for Survey Table (RowMajorTbl)
+        JDL 5/30/25
+        """
+        # Import and parse the Survey test data
+        tbls_both.Survey.ImportToTblDf(lst_files='tbl1_survey.xlsx')
+
+        #for i, df in enumerate(tbls_both.Survey.lst_dfs):
+        #    print(f'\nRaw df {i}\n{df}')
+
+        tbls_both.Survey.ParseRawData()
+
+        print('\n\n', tbls_both.Survey.df, '\n')
+
+        # Check resulting .df
+        df = tbls_both.Survey.df
+        assert len(df) == 11
+        lst = ['question_text', 'Answer Choices', 'Response Percent', 'Responses', '1', '2', '3']
+        assert list(df.columns) == lst
+        assert list(df['question_text']) == 5 *  ['Q1. How often do you wash your car?'] + \
+                            3 * ['Q2. What brands of car wash cleaner do you use'] + \
+                            3 * ['Q3. How would you improve your current product (Rank 1 to 3)']
+
+        # Check first and last row values                   
+        cols = ['Answer Choices', 'Response Percent', 'Responses', '1', '2', '3']
+        assert list(df.iloc[0][cols]) == ['Daily', '14.13%', '76', np.nan, np.nan, np.nan]
+        assert list(df.iloc[-1][cols]) == ['Improved cleaning', np.nan, np.nan,'18', '11', '17']
+
+        if IsPrint:
+            print(f'\nRaw df\n{tbls_both.Survey.lst_dfs[0]}')
+            print(f'\nParsed df\n{tbls_both.Survey.df}\n\n')
+            print(tbls_both.Survey.df.info(), '\n')
+
+"""
+===============================================================================
+Test Class parsefiles.InterleavedColBlocksTbl
 ===============================================================================
 """
 @pytest.fixture
@@ -35,7 +135,7 @@ def tbls(files):
     # Instance Promos Table with import and parse parameters
     d = {'ftype':'excel', 'sht':'sheet1', 'import_path':files.path_data}
     d['lst_files'] = 'interleaved_test_data.xlsx'
-    d2 = {'is_unstructured':True, 'parse_type':'interleaved_col_blocks', \
+    d2 = {'is_unstructured':True, 'parse_type':'InterleavedColBlocksTbl', \
         'n_cols_metadata':3, 'idx_start':1, 'n_cols_block':2}
     tbls.Promos = Table('Promos', dImportParams=d, dParseParams=d2)
     return tbls
@@ -51,16 +151,14 @@ def parse_int(files, tbls):
 
     return parsetables.InterleavedColBlocksTbl(tbls.Promos)
 
-"""
-===============================================================================
-"""
+
 class TestInterleavedColBlocks:
-    def test_ParseInterleavedBlocksProcedure(self, parse_int):
+    def test_ParseDfRawProcedure(self, parse_int):
         """
         Test - Procedure to parse interleaved blocks of columns
         JDL 3/17/25
         """
-        parse_int.ParseInterleavedBlocksProcedure()
+        parse_int.ParseDfRawProcedure()
         if IsPrint: print('\n', parse_int.df)
         assert len(parse_int.df) == 48
 
@@ -182,12 +280,7 @@ class TestInterleavedColBlocks:
 
         assert parse_int.df_raw.index.size == 15
 
-"""
-Stop 13:30 9/27/24
-Committed working code with block_id vars
-Ready to add mods to Stack procedure to account for block_id vars
-Should test that on survey data
-"""
+
 """
 ================================================================================
 Importing/Parsing Raw Data with ProjectTables class 
@@ -213,7 +306,7 @@ def dParseParams_tbl1_survey():
     """
     dParseParams = {}
     dParseParams['is_unstructured'] = True
-    dParseParams['parse_type'] = 'row_major'
+    dParseParams['parse_type'] = 'RowMajorTbl'
     dParseParams['import_dtype'] = str
     dParseParams['flag_start_bound'] = 'Answer Choices'
     dParseParams['flag_end_bound'] = '<blank>'
@@ -227,43 +320,44 @@ def dParseParams_tbl1_survey():
 def tbl1_survey(files, dParseParams_tbl1_survey):
     """
     Table object for survey data
-    JDL 9/25/24; Modified 5/29/25
+    JDL 9/25/24; Modified 5/30/25
     """
-    dImport = {'ftype':'excel', 'import_path':files.path_data,
-        'sht':'raw_table', 'lst_files':'tbl1_survey.xlsx'}
-    tbl = Table('tbl1_survey', dImportParams=dImport, \
-        dParseParams=dParseParams_tbl1_survey)
-    tbl.ImportToTblDf()
+    d = {'ftype':'excel', 'import_path':files.path_data,'sht':'raw_table'}
+    tbl = Table('tbl1_survey', dImportParams=d, dParseParams=dParseParams_tbl1_survey)
+    tbl.ImportToTblDf(lst_files='tbl1_survey.xlsx')
     return tbl
 
 @pytest.fixture
 def row_maj_tbl1_survey(tbl1_survey):
     """
     Instance RowMajorTbl parsing class for survey data
-    JDL 9/25/24
+    JDL 9/25/24; Modified 5/30/25
     """
-    return parsetables.RowMajorTbl(tbl1_survey, df=tbl1_survey.lst_dfs[0])
+    # Simulate iteration df from .lst_dfs
+    tbl1_survey.df_raw = tbl1_survey.lst_dfs[0]
+
+    return parsetables.RowMajorTbl(tbl1_survey)
 
 """
 ================================================================================
 """
 class TestParseRowMajorTbl1Survey:
     
-    def test_survey_ReadBlocksProcedure1(self, row_maj_tbl1_survey):
+    def test_survey_ParseDfRawProcedure1(self, row_maj_tbl1_survey):
         """
         Procedure to iteratively parse row major blocks
         (parse a raw table containing two blocks)
         JDL 9/26/24
         """
-        row_maj_tbl1_survey.ReadBlocksProcedure()
+        row_maj_tbl1_survey.ParseDfRawProcedure()
 
         #Check that procedure found three blocks
         assert row_maj_tbl1_survey.start_bound_indices == [3, 14, 24]
-        assert len(row_maj_tbl1_survey.tbl.df) == 11
+        assert len(row_maj_tbl1_survey.df) == 11
 
-        df_check = row_maj_tbl1_survey.tbl.df
+        df_check = row_maj_tbl1_survey.df
 
-        if IsPrint: print('\n\n', row_maj_tbl1_survey.tbl.df, '\n')
+        if IsPrint: print('\n\n', row_maj_tbl1_survey.df, '\n')
 
         lst_expected = ['Daily', '14.13%', '76', np.nan, np.nan, np.nan]
         check_series_values(df_check.iloc[0], lst_expected)
@@ -272,7 +366,7 @@ class TestParseRowMajorTbl1Survey:
 
         if False: print_tables(row_maj_tbl1_survey)
 
-    def xtest_survey_ReadBlocksProcedure2(self, row_maj_tbl1_survey):
+    def xtest_survey_ParseDfRawProcedure2(self, row_maj_tbl1_survey):
         """
         ===Move to ApplyColInfo===
         Procedure to iteratively parse row major blocks
@@ -281,26 +375,11 @@ class TestParseRowMajorTbl1Survey:
         JDL 9/25/24
         """
         row_maj_tbl1_survey.tbl.dParseParams['is_stack_parsed_cols'] = True
-        row_maj_tbl1_survey.ReadBlocksProcedure()
+        row_maj_tbl1_survey.ParseDfRawProcedure()
 
-        assert len(row_maj_tbl1_survey.tbl.df) == 11
+        assert len(row_maj_tbl1_survey.df) == 11
 
-        if IsPrint: print('\n\n', row_maj_tbl1_survey.tbl.df, '\n')
-
-        #===remove StackParsedCols to move to ApplyColInfo===
-        # Check values in first two and last two rows
-        #df_check = row_maj_tbl1_survey.tbl.df.reset_index(drop=False)
-        #lst_expected = ['Daily', 'Response Percent', '14.13%']
-        #check_series_values(df_check.iloc[0], lst_expected)
-        #lst_expected = ['Daily', 'Responses', '76']
-        #check_series_values(df_check.iloc[1], lst_expected)
-
-        #lst_expected =  ['Improved cleaning', '3', '17']
-        #check_series_values(df_check.iloc[-1], lst_expected)
-        #lst_expected =  ['Improved cleaning', '2', '11']
-        #check_series_values(df_check.iloc[-2], lst_expected)
-
-        if False: print_tables(row_maj_tbl1_survey)
+        if IsPrint: print('\n\n', row_maj_tbl1_survey.df, '\n')
 
     def test_survey_ParseBlockProcedure1(self, row_maj_tbl1_survey):
         """
@@ -308,17 +387,16 @@ class TestParseRowMajorTbl1Survey:
         (1st block)
         JDL 9/25/24
         """
-
         SetListFirstStartBoundIndex(row_maj_tbl1_survey)
         row_maj_tbl1_survey.ParseBlockProcedure()
 
-        #Check resulting .tbl.df relative to tbl1_survey.xlsx
-        assert len(row_maj_tbl1_survey.tbl.df) == 5
+        #Check resulting .df relative to tbl1_survey.xlsx
+        assert len(row_maj_tbl1_survey.df) == 5
 
-        if IsPrint: print('\n\n', row_maj_tbl1_survey.tbl.df, '\n')
+        if IsPrint: print('\n\n', row_maj_tbl1_survey.df, '\n')
 
-        assert list(row_maj_tbl1_survey.tbl.df.iloc[0]) == ['Daily', '14.13%', '76']
-        assert list(row_maj_tbl1_survey.tbl.df.iloc[-1]) == ['Rarely', '0.37%', '2']
+        assert list(row_maj_tbl1_survey.df.iloc[0]) == ['Daily', '14.13%', '76']
+        assert list(row_maj_tbl1_survey.df.iloc[-1]) == ['Rarely', '0.37%', '2']
 
         if False: print_tables(row_maj_tbl1_survey)
 
@@ -338,30 +416,14 @@ class TestParseRowMajorTbl1Survey:
 
         row_maj_tbl1_survey.ParseBlockProcedure()
 
-        if IsPrint: print('\n\n', row_maj_tbl1_survey.tbl.df, '\n')
+        if IsPrint: print('\n\n', row_maj_tbl1_survey.df, '\n')
 
-        #Check resulting .tbl.df relative to tbl1_survey.xlsx
-        assert len(row_maj_tbl1_survey.tbl.df) == 3
-        assert list(row_maj_tbl1_survey.tbl.df.iloc[0]) == ['Lower price point', '91', '33', '19']
-        assert list(row_maj_tbl1_survey.tbl.df.iloc[-1]) == ['Improved cleaning', '18', '11', '17']
+        #Check resulting .df relative to tbl1_survey.xlsx
+        assert len(row_maj_tbl1_survey.df) == 3
+        assert list(row_maj_tbl1_survey.df.iloc[0]) == ['Lower price point', '91', '33', '19']
+        assert list(row_maj_tbl1_survey.df.iloc[-1]) == ['Improved cleaning', '18', '11', '17']
 
         if False: print_tables(row_maj_tbl1_survey)
-
-    def xtest_survey_SubsetCols(self, row_maj_tbl1_survey):
-        """
-        ===Move to ApplyColInfo===
-        Use tbl.import_col_map to subset columns based on header.
-        JDL 9/24/24
-        """
-        SetListFirstStartBoundIndex(row_maj_tbl1_survey)
-        row_maj_tbl1_survey.FindFlagEndBound()
-        row_maj_tbl1_survey.ReadHeader()
-        row_maj_tbl1_survey.SubsetDataRows()
-        row_maj_tbl1_survey.SubsetCols()
-
-        # Assert that column names are correct before renaming
-        lst_expected = ['Answer Choices', 'Response Percent', 'Responses']
-        assert list(row_maj_tbl1_survey.df_block.columns) == lst_expected
 
     def test_survey_SubsetDataRows(self, row_maj_tbl1_survey):
         """
@@ -373,7 +435,7 @@ class TestParseRowMajorTbl1Survey:
         row_maj_tbl1_survey.ReadHeader()
         row_maj_tbl1_survey.SubsetDataRows()
 
-        # Check resulting .tbl.df relative to tbl1_raw.xlsx
+        # Check resulting .df relative to tbl1_raw.xlsx
         assert len(row_maj_tbl1_survey.df_block) == 5
         lst_expected = ['Daily', '14.13%', '76', None, None, None]
         check_series_values(row_maj_tbl1_survey.df_block.iloc[0], lst_expected)
@@ -462,7 +524,7 @@ def dParseParams_tbl1():
     """
     dParseParams = {}
     dParseParams['is_unstructured'] = True
-    dParseParams['parse_type'] = 'row_major'
+    dParseParams['parse_type'] = 'RowMajorTbl'
     dParseParams['import_dtype'] = str
     dParseParams['flag_start_bound'] = 'flag'
     dParseParams['flag_end_bound'] = '<blank>'
@@ -482,13 +544,10 @@ def tbl1(files, dParseParams_tbl1):
     Table object for example data
     JDL 9/25/24; Modified 4/21/25
     """
-    # Instance Table
-    dImport = {'ftype':'excel',
-        'import_path':files.path_data,
-        'sht':'raw_table',
-        'lst_files':'tbl1_raw.xlsx'}
-    tbl = Table('tbl1_raw', dImportParams=dImport, dParseParams=dParseParams_tbl1)
-    tbl.ImportToTblDf()
+    # Instance Table and import data
+    d = {'ftype':'excel', 'import_path':files.path_data, 'sht':'raw_table'}
+    tbl = Table('tbl1', dImportParams=d, dParseParams=dParseParams_tbl1)
+    tbl.ImportToTblDf(lst_files='tbl1_raw.xlsx')
     return tbl
 
 @pytest.fixture
@@ -496,32 +555,31 @@ def row_maj_tbl1(tbl1):
     """
     Instance RowMajorTbl parsing class for Table1 data
     (df argument simulates iteration df from .lst_dfs)
-    JDL 9/26/24; Modified 4/21/25
+    JDL 9/26/24; Modified 5/30/25
     """
-    parse = parsetables.RowMajorTbl(tbl1, df=tbl1.lst_dfs[0])
-    parse.tbl.import_col_map = \
-            {'idx_raw':'idx', 'col #1':'col_1', 'col #2':'col_2'}
-    parse.tbl.col_order = pd.Series(index=[0, 1, 2], data=['idx', 'col_2', 'col_1'])
+    tbl1.df_raw = tbl1.lst_dfs[0] # Simulate iteration through lst_dfs
+    parse = parsetables.RowMajorTbl(tbl1)
     return parse
 
 """
 ================================================================================
 """
-class TestParseRowMajorTbl1:
+class TestParseRowMajorTbl1Raw:
     """row_major parsing of single block from Excel sheet"""
 
-    def test_ReadBlocksProcedure(self, row_maj_tbl1):
+    def test_ParseDfRawProcedure(self, row_maj_tbl1):
         """
         Procedure to iteratively parse row major blocks
         (parse a raw table containing one block)
         JDL 9/26/24; Modified 4/21/25
         """
-        row_maj_tbl1.ReadBlocksProcedure()
+        row_maj_tbl1.ParseDfRawProcedure()
 
         #Check the final state of the table
         self.check_tbl1_values(row_maj_tbl1)
 
-        if False: print_tables(row_maj_tbl1)
+        if IsPrint:
+            print_tables(row_maj_tbl1)
 
     def test_ParseBlockProcedure(self, row_maj_tbl1):
         """
@@ -535,45 +593,21 @@ class TestParseRowMajorTbl1:
         row_maj_tbl1.idx_start_current = row_maj_tbl1.start_bound_indices[0]
         row_maj_tbl1.ParseBlockProcedure()
 
-        assert row_maj_tbl1.tbl.df.shape == (5, 3)
+        assert row_maj_tbl1.df.shape == (5, 4)
         assert row_maj_tbl1.df_raw.shape == (14, 5)
     
-    def xtest_SetDefaultIndex(self, row_maj_tbl1):
-        """
-        ===Move to ApplyColInfo===
-        Set default index and check the final state of the table.
-        JDL 3/4/24; Modified 4/21/25
-        """
-        # Precursor methods (ReadBlocksProcedure)
-        row_maj_tbl1.AddTrailingBlankRow()
-        row_maj_tbl1.SetStartBoundIndices()
-        for i in row_maj_tbl1.start_bound_indices:
-            row_maj_tbl1.idx_start_current = i
-            row_maj_tbl1.ParseBlockProcedure()
-
-        row_maj_tbl1.SetDefaultIndex()
-
-        #Extract block_id value specified in dParseParams
-        row_maj_tbl1.tbl.df, row_maj_tbl1.lst_block_ids = \
-            RowMajorBlockID(row_maj_tbl1.tbl, row_maj_tbl1.idx_start_data).ExtractBlockIDs
-        
-        #Check the final state of the table
-        check_tbl1_values(row_maj_tbl1)
-
-        if False: print_tables(row_maj_tbl1)
-
     def check_tbl1_values(self, row_maj_tbl1):
         """
         Check the final state of the table (ApplyColInfo sets data types)
         JDL 3/4/24; Modified 4/22/25
         """
         #Check index name and column names 
-        assert list(row_maj_tbl1.tbl.df.columns) == ['idx_raw', 'col #1', 'col #2', 'stuff']
+        assert list(row_maj_tbl1.df.columns) == ['stuff', 'idx_raw', 'col #1', 'col #2' ]
 
         #Check resulting .tbl.df relative to tbl1_raw.xlsx (import raw to str dtype)
-        assert len(row_maj_tbl1.tbl.df) == 5
-        assert list(row_maj_tbl1.tbl.df.loc[0]) == ['1', '10', 'a', 'Stuff in C']
-        assert list(row_maj_tbl1.tbl.df.loc[4]) == ['5', '50', 'e', 'Stuff in C']
+        assert len(row_maj_tbl1.df) == 5
+        assert list(row_maj_tbl1.df.loc[0]) == ['Stuff in C', '1', '10', 'a']
+        assert list(row_maj_tbl1.df.loc[4]) == ['Stuff in C', '5', '50', 'e']
 
     def test_SubsetDataRows(self, row_maj_tbl1):
         """
@@ -690,7 +724,7 @@ class TestTbl1Fixtures:
 """
 ================================================================================
 RowMajorBlockID Class - sub to RowMajorTbl for extracting block_id values
-JDL 9/27/24
+JDL 9/27/24; Refactored 5/30/25
 ================================================================================
 """
 class TestExtractBlockIDs:
@@ -699,17 +733,19 @@ class TestExtractBlockIDs:
         Procedure to extract block ID values from df_raw
         (Each Block_ID variable input as tuple in tbl.dParseParams['block_id_vars'])
         BlockID's are individual values located relative to first row of data in bloc
-        JDL 9/27/24
+        JDL 9/27/24; Updated 5/30/25
         """
-        #Parse the block's row major data to populate .tbl.df
-        self.create_tbl_df(row_maj_tbl1)
+        # Run precursor ParseDfRawProcedure and ParseBlockProcedure methods
+        self.create_df_block(row_maj_tbl1)
+        assert row_maj_tbl1.df_block.shape == (5, 3)
 
-        #Call property to extract block IDs
-        df, lst = RowMajorBlockID(row_maj_tbl1).ExtractBlockIDs
+        #Call property to extract block ID(s)
+        row_maj_tbl1.df_block = parsetables.RowMajorBlockID(row_maj_tbl1).ExtractBlockIDs
 
-        assert lst == ['stuff']
-        assert len(df) == 5
-        assert list(df.columns) == ['idx_raw', 'col #1', 'col #2', 'stuff']
+        df_block = row_maj_tbl1.df_block
+        assert len(df_block) == 5
+        assert list(df_block.columns) == ['stuff', 'idx_raw', 'col #1', 'col #2']
+        assert (df_block['stuff'] == 'Stuff in C').all()
 
     def test_blockids_ExtractBlockIDsProcedure2(self, row_maj_tbl1):
         """
@@ -717,89 +753,67 @@ class TestExtractBlockIDs:
         (Two Block_ID variables input as list)
         JDL 9/27/24
         """
-        #Parse the block's row major data to populate .tbl.df
-        self.create_tbl_df(row_maj_tbl1)
+        # Run precursor ParseDfRawProcedure and ParseBlockProcedure methods
+        self.create_df_block(row_maj_tbl1)
+        assert row_maj_tbl1.df_block.shape == (5, 3)
 
-        #Override default parsing instruction
-        lst = [('stuff', -4, 2), ('stuff2', -2, 1)]
-        row_maj_tbl1.tbl.dParseParams['block_id_vars'] = lst
-            
-        #Call property to extract block IDs
-        df, lst = RowMajorBlockID(row_maj_tbl1).ExtractBlockIDs
+        #Override default parsing instruction and call property to extract block IDs
+        row_maj_tbl1.lst_block_ids = [('stuff', -4, 2), ('stuff2', -2, 1)]
+        row_maj_tbl1.df_block = parsetables.RowMajorBlockID(row_maj_tbl1).ExtractBlockIDs
 
-        assert lst == ['stuff', 'stuff2']
-        assert len(df) == 5
-        assert list(df.columns) == ['idx_raw', 'col #1', 'col #2', 'stuff', 'stuff2']
-        assert all(df['stuff'] == 'Stuff in C') 
-        assert all(df['stuff2'] == 'flag') 
+        df_block = row_maj_tbl1.df_block
+        assert len(df_block) == 5
+        assert list(df_block.columns) == ['stuff', 'stuff2', 'idx_raw', 'col #1', 'col #2']
+        assert (df_block['stuff'] == 'Stuff in C').all()
+        assert (df_block['stuff2'] == 'flag').all()
 
-    def xtest_blockids_ReorderColumns(self, row_maj_tbl1):
+    def test_ReadBlockIDValue(self, row_maj_tbl1):
         """
-        ===Move to ApplyColInfo (one column reorder based on tbl.col_order)===
-        If only one block_id, it can be specified as tuple; otherwise it's
-        a list of tuples.
-        JDL 9/27/24
+        Set .df_block column from an individual block ID tuple
+        JDL 9/27/24; Rewriteen 5/30/25
         """
-        #Parse the block's row major data to populate .tbl.df
-        create_tbl_df(row_maj_tbl1)
+        # Run precursor ParseDfRawProcedure and ParseBlockProcedure methods
+        self.create_df_block(row_maj_tbl1)
 
-        #Instance of RowMajorBlockID
-        row_maj_block_id = RowMajorBlockID(row_maj_tbl1.tbl, row_maj_tbl1.idx_start_data)
+        #Instance RowMajorBlockID and get block_id value
+        blockid = parsetables.RowMajorBlockID(row_maj_tbl1)
 
-        #Call methods
-        row_maj_block_id.ConvertTupleToList()
-        row_maj_block_id.SetBlockIDValue(row_maj_tbl1.tbl.dParseParams['block_id_vars'][0])
-        row_maj_block_id.ReorderColumns()
-        assert list(row_maj_block_id.tbl.df.columns) == ['stuff', 'idx', 'col_1', 'col_2']
+        # use first/only block_id var for testing; check blockid.df_block
+        blockid.SetBlockIDColValue(row_maj_tbl1.lst_block_ids[0])
+        assert list(blockid.df_block.columns) == ['idx_raw', 'col #1', 'col #2', 'stuff']
+        assert (blockid.df_block['stuff'] == 'Stuff in C').all()
 
-    def test_SetBlockIDValue(self, row_maj_tbl1):
+    def test_RowMajorBlockID(self, row_maj_tbl1):
         """
-        If only one block_id, it can be specified as tuple; otherwise it's
-        a list of tuples.
-        JDL 9/27/24; Modified/revalidated 4/22/25
-        """
-        #Parse the block's row major data to populate .tbl.df
-        self.create_tbl_df(row_maj_tbl1)
+        Test initialization with options for .lst_block_ids
+        JDL 5/30/25
+        """        
+        # .lst_block_ids is set as non-list tuple in fixture
+        blockid = parsetables.RowMajorBlockID(row_maj_tbl1)
+        self.check_blockid_values(blockid)
 
-        #Instance of RowMajorBlockID
-        row_maj_block_id = RowMajorBlockID(row_maj_tbl1)
-        row_maj_block_id.ConvertTupleToList()
+        # Set to single-item list
+        row_maj_tbl1.tbl.dParseParams['block_id_vars'] = [('stuff', -4, 2)]
+        blockid = parsetables.RowMajorBlockID(row_maj_tbl1)
+        self.check_blockid_values(blockid)
 
-        # use first/only block_id var for testing; Set block_id value
-        var_current = row_maj_tbl1.tbl.dParseParams['block_id_vars'][0]
-        row_maj_block_id.SetBlockIDValue(var_current)
+    def check_blockid_values(self, blockid):
+        assert isinstance(blockid.lst_block_ids, list)
+        assert blockid.lst_block_ids[0][0] == 'stuff'
+        assert blockid.lst_block_ids[0][1] == -4
+        assert blockid.lst_block_ids[0][2] == 2
 
-        assert row_maj_block_id.block_id_names == ['stuff']
-        assert list(row_maj_block_id.tbl.df.columns) == ['idx_raw', 'col #1', 'col #2', 'stuff']
-        assert all(row_maj_block_id.tbl.df['stuff'] == 'Stuff in C') 
+    def create_df_block(self, row_maj_tbl1):
+        #Precursor methods (ParseDfRawProcedure)
+        row_maj_tbl1.AddTrailingBlankRow()
+        row_maj_tbl1.SetStartBoundIndices()
+        row_maj_tbl1.idx_start_current = row_maj_tbl1.start_bound_indices[0]
 
-    def create_tbl_df(self, row_maj_tbl):
-        """
-        Helper function to parse raw data to row_maj_tbl.tbl.df
-        JDL 9/27/24
-        """
-        # Set idx_start_current to first list item
-        SetListFirstStartBoundIndex(row_maj_tbl)
+        # Precursor methods (ParseBlockProcedure)
+        row_maj_tbl1.FindFlagEndBound()
+        row_maj_tbl1.ReadHeader()
+        row_maj_tbl1.SubsetDataRows()
 
-        # Parse that block and check that it got parsed
-        row_maj_tbl.ParseBlockProcedure()
-        assert len(row_maj_tbl.tbl.df) == 5
-
-    def test_ConvertTupleToList(self, tbl1, row_maj_tbl1):
-        """
-        If only one block_id, it can be specified as tuple; otherwise it's
-        a list of tuples.
-        JDL 9/27/24
-        """
-        #instance of RowMajorBlockID --arg needs to be parse object aka RowMajorTbl
-        row_maj_block_id = RowMajorBlockID(row_maj_tbl1)
-
-        #Check input from dParseParams fixture
-        assert isinstance(tbl1.dParseParams['block_id_vars'], tuple)
-
-        #Call method and check conversion to list
-        row_maj_block_id.ConvertTupleToList()
-        assert isinstance(tbl1.dParseParams['block_id_vars'], list)
 
 """
 ================================================================================

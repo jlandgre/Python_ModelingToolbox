@@ -83,7 +83,7 @@ This dictionary specifies parsing-related parameters.
 |-------------------|---------------------------------------------------------------------------------|------------------------|-------------------|
 | `is_unstructured` | Indicates whether the data is unstructured. If so, Table.lst_dfs is output; otherwise Table.df                                     | Optional               | `False`           |
 | `n_skip_rows`     | Number of rows to skip at the top of the file (for structured data only).             | Optional               | `0`               |
-| `parse_type`      | Parsing type for unstructured data. Currently supported values: `'none'`, `'row_major'`, `'interleaved_col_blocks'`. | Optional | `'none'` |
+| `parse_type`      | Name of parse class (in parsetables.py) for converting data in an unstructured but repeatable format. Currently supported values: `'none'`, `'RowMajorTbl'`, `'InterleavedColBlocksTbl'`. The parse Class must contain a `ParseDfRawProcedure()` method as described below in `ParseRawData` documenation| Optional | `'none'` |
 | parser-specific params      | Varies by `parse_type`| Required | NA |
 ---
 
@@ -167,7 +167,26 @@ To be implemented as of 4/13/25
 - **Invalid Sheet Name**: Raises an error if the specified sheet does not exist in the Excel file.
 
 ## User Guide for `Table.ParseRawData` Method
-<<TBD>>
+The method shown below converts a list of df's containing unstructured data to a concatenated rows/columns Dataframe. It takes the Table instance (aka `self` in the code) as its sole argument. ParseRawData instances the parse class specified by Table.dParseParams['parse_type'] whose string value should be the name of a class in parsetables.py. The parse class must contain a ParseDfRawProcedure method that uses Table.df_raw as input to populate parse.df. This architecture and its use of `getattr` means that new parse classes can be added to parsetables.py as needed without modification to .ParseRawData().
 
+```python
+    import parsetables
+
+    def ParseRawData(self):
+        """
+        Procedure to parse raw data for a given Table instance
+        Updated 5/30/25
+        """
+        for self.df_raw in self.lst_dfs:
+
+            # instance parse class with tbl (aka self) as argument and parse
+            parse = getattr(parsetables, self.dParseParams['parse_type'])(self)
+            parse.ParseDfRawProcedure()
+                
+            # Concatenate parsed data to tbl.df
+            self.df = pd.concat([self.df, parse.df], ignore_index=True)
+```
+
+Example .ParseDfRawProcedure() for 
 J.D. Landgrebe, Data Delve LLC
 April 12, 2025; Updated 5/29/25

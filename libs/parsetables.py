@@ -1,4 +1,4 @@
-# Version 5/29/25
+# Version 5/30/25
 import pandas as pd
 import numpy as np
 """
@@ -35,10 +35,10 @@ class InterleavedColBlocksTbl():
         self.block_name_cur = None
         self.idx_col_cur = None
 
-    def ParseInterleavedBlocksProcedure(self):
+    def ParseDfRawProcedure(self):
         """
         Procedure to parse interleaved blocks of columns
-        JDL 3/17/25
+        JDL 3/17/25; Name updated 5/30/25
         """
         self.SetDfMetadata()
         self.DeleteTrailingRows()
@@ -116,32 +116,31 @@ class InterleavedColBlocksTbl():
         self.df.loc[self.df.index[-n_rows_new:], 'values'] = values.values
 """
 ================================================================================
-RowMajorTbl Class - for parsing row major raw data single block
+RowMajorTbl Class - parsing files containing multiple row major blocks
 ================================================================================
 """
 class RowMajorTbl():
     """
-    Description and Parsing Row Major Table initially embedded in tbl.df
-    (imported with tbls.ImportInputs() or .ImportRawInputs() methods
-    JDL 3/4/24; Modified 9/26/24
+    Parse Row Major Table embedded in tbl.df_raw
+    JDL 3/4/24; Modified 5/30/25
     """
-    def __init__(self, tbl, df=None):
+    def __init__(self, tbl):
         
-        # If df (raw data) is specified from tbl.lst_dfs iteration, use it
-        if df is not None:
-            self.df_raw = df
-        else:
-            self.df_raw = tbl.df_raw
+        #Raw DataFrame
+        self.df_raw = tbl.df_raw
 
         #List of df indices for rows where flag_start_bound is found
         self.start_bound_indices = []
 
-        #Raw DataFrame and column list parsed from raw data
-        #self.df_raw = tbl.df_raw
-
         #Table whose df is to be populated by parsing
         self.tbl = tbl
-        self.lst_block_ids = []
+
+        #List of block IDs to extract (or individual tuple converted to list)
+        self.lst_block_ids = tbl.dParseParams.get('block_id_vars', [])
+        if isinstance(self.lst_block_ids, tuple): self.lst_block_ids = [self.lst_block_ids]
+
+        # Output DataFrame
+        self.df = pd.DataFrame()
 
         #Start, header, end, first data row indices for current block in loop
         self.idx_start_current = None
@@ -155,10 +154,10 @@ class RowMajorTbl():
     """
     ================================================================================
     """
-    def ReadBlocksProcedure(self):
+    def ParseDfRawProcedure(self):
         """
-        Procedure to iteratively parse row major blocks
-        JDL 9/26/24
+        Procedure to iteratively parse row major blocks into self.df
+        JDL 9/26/24; Refactored 5/30/25
         """
         # Append blank row at end of .df_raw (to ensure find last <blank> flag)
         self.AddTrailingBlankRow()
@@ -171,15 +170,7 @@ class RowMajorTbl():
             self.idx_start_current = i
             self.ParseBlockProcedure()
 
-        #Extract block_id values if specified (Note: self arg is RowMajorTbl instance)
-        self.tbl.df, self.lst_block_ids = RowMajorBlockID(self).ExtractBlockIDs
-
-        #set default index
-        #self.SetDefaultIndex()
-        self.tbl.df = self.tbl.df.reset_index(drop=True)
-
-        #Optionally stack parsed data (if .dParams['is_stack_parsed_cols']
-        #self.StackParsedCols()
+        self.df = self.df.reset_index(drop=True)
 
     def AddTrailingBlankRow(self):
         """
@@ -201,50 +192,21 @@ class RowMajorTbl():
         fil = self.df_raw.iloc[:, icol] == flag
         self.start_bound_indices = self.df_raw[fil].index.tolist()
 
-    def SetDefaultIndex(self):
-        """
-        Set the table's default index
-        JDL 3/4/24
-        """
-        self.tbl.df = self.tbl.df.set_index(self.tbl.idx_col_name)
-    
-    def StackParsedCols(self):
-        """
-        Optionally stack parsed columns from row major blocks
-        JDL 9/25/24; Modified 4/23 remove from procedure/move to Apply ColInfo
-        """
-        is_stack = self.tbl.dParseParams.get('is_stack_parsed_cols', False)
-
-        #xxx
-        self.tbl.df = self.tbl.df.set_index('Answer Choices')
-        self.tbl.idx_col_name = 'Answer Choices'
-        print('\n', self.tbl.df)
-
-        if is_stack:
-            #xxx
-            self.tbl.df = self.tbl.df.stack().reset_index()
-            self.tbl.df = self.tbl.df.stack()
-
-            print('\n', self.tbl.df)
-
-            #Respecify the index column name and set default index
-            self.tbl.df.columns = [self.tbl.idx_col_name, 'Metric', 'Value']
-            self.SetDefaultIndex()
-
     def ParseBlockProcedure(self):
         """
         Parse the table and set self.df resulting DataFrame
-        JDL 9/25/24; Modified 4/22/25
+        JDL 9/25/24; Modified 5/30/25
         """
         self.FindFlagEndBound()
         self.ReadHeader()
         self.SubsetDataRows()
-        #self.SubsetCols()
-        #self.RenameCols()
-        #self.SetColumnOrder()
+        
+        #Update .df_block with block_id vals(self arg is current RowMajorTbl instance)
+        if 'block_id_vars' in self.tbl.dParseParams: 
+            self.df_block = RowMajorBlockID(self).ExtractBlockIDs
 
         #Concatenate into tbl.df and re-initialize df_block
-        self.tbl.df = pd.concat([self.tbl.df, self.df_block], axis=0)
+        self.df = pd.concat([self.df, self.df_block], axis=0)
         self.df_block = pd.DataFrame()
 
     def FindFlagEndBound(self):
@@ -289,45 +251,12 @@ class RowMajorTbl():
         # Create df with block's data rows
         self.df_block = self.df_raw.iloc[self.idx_start_data:self.idx_end_bound]
 
-        # Added 4/23 to replace doing this in SubsetCols()
+        # Set column names
         self.df_block.columns = self.cols_df_block
 
         # Added 4/23 drop columns with null column name and all null values
         fil = ~self.df_block.columns.isnull() & self.df_block.notna().any()
         self.df_block = self.df_block.loc[:, fil]
-
-    def SubsetCols(self):
-        """
-        Use tbl.import_col_map to subset columns based on header.
-        JDL 9/25/24
-        """
-        self.df_block.columns = self.cols_df_block
-
-        #Use import_col_map if specified
-        if len(self.tbl.import_col_map) > 0:
-            cols_keep = list(self.tbl.import_col_map.keys())
-            self.df_block = self.df_block[cols_keep]
-        
-        #Drop columns with blank (e.g. NaN) header
-        else:
-            self.df_block = self.df_block.dropna(axis=1, how='all')
-
-    def RenameCols(self):
-        """
-        Optionally use tbl.import_col_map to rename columns.
-        JDL 3/4/24; Modified 9/24/24
-        """
-        if len(self.tbl.import_col_map) > 0:
-            self.df_block.rename(columns=self.tbl.import_col_map, inplace=True)
-
-    def SetColumnOrder(self):
-        """
-        Set column order based on tbl.col_order Series
-        JDL 4/22/25
-        """
-        if self.tbl.col_order is not None:
-            self.df_block = self.df_block[self.tbl.col_order]
-
 
 """
 ================================================================================
@@ -335,21 +264,18 @@ RowMajorBlockID Class - sub to RowMajorTbl for extracting block_id values
 ================================================================================
 """
 class RowMajorBlockID:
-    def __init__(self, parse_instance):
-        self.tbl = parse_instance.tbl
+    def __init__(self, parse):
 
-        #Index of first data row in .df_raw
-        self.idx_start_data = parse_instance.idx_start_data
+        # Parse instance's tbl, df_raw and first data row index
+        self.tbl = parse.tbl        
+        self.df_raw = parse.df_raw
+        self.idx_start_data = parse.idx_start_data
 
-        #Raw df that is being parsed (.df_raw set in parse_instance.__init__())
-        self.df_raw = parse_instance.df_raw
+        #List of block IDs (orig from tbl.dParseParams['block_id_vars'])
+        self.lst_block_ids = parse.lst_block_ids
 
-        #Within loop value for a block ID
-        self.block_id_value = None
-
-        #List of all block_id names
-        self.df_cols_initial = self.tbl.df.columns.tolist()
-        self.block_id_names = []
+        #Current (in progress) df_block
+        self.df_block = parse.df_block
 
     @property
     def ExtractBlockIDs(self):
@@ -358,56 +284,40 @@ class RowMajorBlockID:
         JDL 9/27/24
         """
         self.ExtractBlockIDsProcedure()
-        return self.tbl.df, self.block_id_names
-    """
-    ============================================================================
-    """
+        return self.df_block
+
     def ExtractBlockIDsProcedure(self):
         """
         Procedure to extract block ID values from df_raw based on current block's
-        data row index and dict list of block_id tuples: (block_id_name, row_offset,
+        idx_start_data and list of block_id tuples: (block_id_name, row_offset,
         col_index) where row_offset is offset from idx_start_data and col_index is 
         absolute column index where each block_id value is found.
+        JDL 9/27/24; refactored 5/30/25
+        """
+        #Iterate over tuples and add columns to self.df_block
+        for tup_block_id in self.lst_block_ids:
+            self.SetBlockIDColValue(tup_block_id)
+
+        #Reorder block_id columns to be first
+        self.ReorderBlockIDCols()
+
+    def ReorderBlockIDCols(self):
+        """
+        Reorder block_id columns to be first in self.df_block
         JDL 9/27/24
         """
-        #Convert to list if specified as one-item tuple
-        self.ConvertTupleToList()
+        blockid_cols = [tup[0] for tup in self.lst_block_ids]
+        others = [col for col in self.df_block.columns if col not in blockid_cols]
+        self.df_block = self.df_block[blockid_cols + others]
 
-        #Iterate through block_id tuples and add columns to tbl.df
-        for tup_block_id in self.tbl.dParseParams.get('block_id_vars', []):
-            self.SetBlockIDValue(tup_block_id)
-            #self.ReorderColumns() #Don't do as part of parsing -- ApplyColInfo takes care of
-
-    def ConvertTupleToList(self):
+    def SetBlockIDColValue(self, tup_block_id):
         """
-        If only one block_id, it can be specified as tuple; otherwise it's
-        a list of tuples.
-        JDL 9/27/24
-        """
-        if 'block_id_vars' in self.tbl.dParseParams:
-
-            #If necessary, convert tuple to one-item list
-            if isinstance(self.tbl.dParseParams['block_id_vars'], tuple):
-                self.tbl.dParseParams['block_id_vars'] = \
-                    [self.tbl.dParseParams['block_id_vars']]
-            
-    def SetBlockIDValue(self, tup_block_id):
-        """
-        Set internal values based current block_id tuple
+        Set .df_block column from an individual block ID tuple
         JDL 9/27/24; Modified 4/22/25 for RowMajorTbl refactor
         """
-        name, row_offset = tup_block_id[0], tup_block_id[1]
+        # tuple consists of (block_id_name, row_offset, col_index)
+        name, row_offset, col_offset = tup_block_id[0], tup_block_id[1], tup_block_id[2]
         idx_row, idx_col = self.idx_start_data + row_offset, tup_block_id[2]
 
-        #Set the current value and add the name list
-        value_block_id = self.df_raw.iloc[idx_row, idx_col]
-        self.block_id_names.append(name)
-        self.tbl.df[name] = value_block_id
-
-    def ReorderColumns(self):
-        """
-        Reorder so that block_id columns are first
-        9/27/24
-        """
-        self.tbl.df = self.tbl.df[self.block_id_names + self.df_cols_initial]
-
+        # Add column with value to .df_block
+        self.df_block[name] = self.df_raw.iloc[idx_row, idx_col]

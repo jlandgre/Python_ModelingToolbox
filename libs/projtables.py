@@ -1,4 +1,4 @@
-#Version 5/28/25
+#Version 5/30/25
 import os, sys
 import pandas as pd
 import numpy as np
@@ -7,8 +7,7 @@ import itertools
 
 path_libs = os.getcwd() + os.sep + 'libs' + os.sep
 if not path_libs in sys.path: sys.path.append(path_libs)
-import pd_util
-from parsetables import *
+import parsetables
 
 """
 ================================================================================
@@ -93,28 +92,23 @@ class Table():
         """
     ================================================================================
     ParseRawData Procedure
-    If imported data are not rows/cols structured, parse .lst_dfs to .df using
+    * If imported data are not rows/cols structured, parse .lst_dfs to .df using
     dParseParams inputs to guide parsing
-    JDL 4/21/25; updated 5/5/25
+    * all parsing classes have ParseDfRawProcedure that populates parse.df
+    JDL 4/21/25; updated 5/30/25
     ================================================================================
     """
     def ParseRawData(self):
         """
-        Procedure to parse raw data for a given Table instance.
+        Procedure to parse raw data for a given Table instance
+        Updated 5/30/25
         """
-        # .df_raw as iteration variable
         for self.df_raw in self.lst_dfs:
 
-            # Row Major raw data format
-            if self.dParseParams['parse_type'] == 'row_major':
-                parse = RowMajorTbl(self)
-                parse.ReadBlocksProcedure()
-            
-            # Interleaved Column Blocks raw data format
-            elif self.dParseParams['parse_type'] == 'interleaved_col_blocks':
-                parse = InterleavedColBlocksTbl(self)
-                parse.ParseInterleavedBlocksProcedure()
-        
+            # instance parse class with tbl (aka self) as argument and parse
+            parse = getattr(parsetables, self.dParseParams['parse_type'])(self)
+            parse.ParseDfRawProcedure()
+                
             # Concatenate parsed data to tbl.df
             self.df = pd.concat([self.df, parse.df], ignore_index=True)
 
@@ -215,7 +209,7 @@ class Table():
         """
         Set .lst_sheets based on sht_type and sht in dImportParams
         (Called within iteration with self.pf file)
-        JDL 4/10/25
+        JDL 4/10/25; Updated 5/30/25
         """
         self.lst_sheets = []
 
@@ -224,7 +218,7 @@ class Table():
             # Set sheet name to either specified or 0 (e.g. first sheet)
             self.lst_sheets = [self.dImportParams.get('sht', 0)]
 
-            # If sheet name is 0, reset it to first sheet name
+            # If sheet name 0, reset to first sheet name (must open to see sht names)
             if self.lst_sheets[0] == 0:
                 wb = load_workbook(filename=self.pf, read_only=True)
                 self.lst_sheets[0] = wb.sheetnames[0]
@@ -291,19 +285,6 @@ class Table():
         # Append temp df to lst_dfs and re-initialize
         self.lst_dfs.append(self.df_temp)
         self.df_temp = pd.DataFrame()
-
-
-    def ResetDefaultIndex(self, IsDrop=True):
-        """
-        Set or Reset df index to the default defined for the table
-        JDL 2/20/24; Fix bug with else branch 9/3/24
-        """
-        if self.idx_col_name is None: return self.df
-        if self.df.index.name is None:
-            self.df = self.df.set_index(self.idx_col_name)
-        else:
-            self.df = self.df.reset_index(drop=IsDrop)
-            self.df = self.df.set_index(self.idx_col_name)
 
 class CheckInputs:
     """
