@@ -1,5 +1,5 @@
-# Version 4/3/25
-# cd Box\ Sync/Projects/Python_Col_Info/tests
+# Version 6/4/25
+# cd Box\ Sync/Projects/Python_Modeling_Toolbox/tests
 import sys, os
 import pandas as pd
 import numpy as np
@@ -96,8 +96,8 @@ def tbls1(files, cinfo):
     cinfo fixture includes column info for ModelRaw
     JDL 5/28/25
     """
-    tbls1 = ProjectTables(files)
-    tbls1.ModelRaw = Table('ModelRaw', col_info=cinfo)
+    tbls1 = ProjectTables(files, UseColInfo=True)
+    tbls1.ModelRaw = Table('ModelRaw', col_info=tbls1.col_info)
 
     # Example dataset with three key (index) columns and one value column
     # All strings as if imported with Table.ImportToTblDf()
@@ -108,6 +108,22 @@ def tbls1(files, cinfo):
         'units_redeemed': ['100.', '200.', '300.', '400.', '500.', '600.']}
     tbls1.ModelRaw.df = pd.DataFrame(data)
     return tbls1
+
+"""
+=========================================================================
+Other Methods
+=========================================================================
+"""
+class TestOtherMethods:
+    def test_SetTblIndexList(self, tbls1):
+        """
+        Set tbl's .idx attribute to a list of index columns
+        (test_tbls1_fixture checks that tbls.ModelRaw.dfColInfo is set)
+        JDL 6/4/25
+        """
+        tbls1.col_info.SetTblIndexList(tbls1.ModelRaw)
+        assert tbls1.ModelRaw.idx == ['date_wk_start', 'pl_abbr', 'retailer']
+
 
 class TestColInfoCleanupImportedSales:
     def test_CleanupImportedDataProcedure1(self, cinfo_no_init, tbls1):
@@ -164,7 +180,7 @@ class TestColInfoCleanupImportedSales:
         assert tbls1.ModelRaw.df['date_wk_start'].apply(lambda x: isinstance(x, dt.date)).all()
         assert tbls1.ModelRaw.df['units_redeemed'].apply(lambda x: isinstance(x, float)).all()
 
-    def test_tbls1_fixture(self, tbls1):
+    def test_tbls1_fixture(self, files, tbls1):
         """
         Check Raw Data
         JDL 5/28/25
@@ -173,6 +189,14 @@ class TestColInfoCleanupImportedSales:
         assert tbls1.ModelRaw.df.shape == (6, 5)
         lst = ['ABBREV', 'DUMMY', 'DATE', 'RETAILER', 'units_redeemed']
         assert tbls1.ModelRaw.df.columns.tolist() == lst
+
+        # Check tbls.col_info.df got created
+        assert tbls1.col_info.df.shape[1] == 9
+        assert tbls1.col_info.df.shape[0] >= 5
+
+        # Check individual table's dfColInfo got created
+        assert isinstance(tbls1.ModelRaw.dfColInfo, pd.DataFrame)
+        assert tbls1.ModelRaw.dfColInfo.shape == (5, 9)
 
 """
 =============================================================================

@@ -1,4 +1,4 @@
-# Version 5/28/25
+# Version 6/4/25
 import pandas as pd
 import numpy as np
 import datetime as dt
@@ -102,6 +102,23 @@ class ColumnInfo:
             # Use .astype directly on the data_type string
             else:
                 tbl.df[col] = tbl.df[col].astype(data_type)
+
+    """
+    =========================================================================
+    Other Methods
+    =========================================================================
+    """
+    def SetTblIndexList(self, tbl):
+        """
+        Set tbl.idx to a list of index columns from tbl.dfColInfo
+        JDL 6/4/25
+        """
+        # Filter for columnns with and index order specified
+        fil = self.SetFilterColInfoPopulated(tbl, ['idx_order', 'cols'], True)
+
+        # Get the filtered list and sort by idx_order
+        lst_index_cols = tbl.dfColInfo.loc[fil].sort_values('idx_order')['cols'].tolist()
+        tbl.idx = lst_index_cols
 
 
     """

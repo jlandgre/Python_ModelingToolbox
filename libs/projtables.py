@@ -1,13 +1,13 @@
-#Version 5/30/25
+#Version 6/4/25
 import os, sys
 import pandas as pd
 import numpy as np
 from openpyxl import load_workbook
-import itertools
 
 path_libs = os.getcwd() + os.sep + 'libs' + os.sep
 if not path_libs in sys.path: sys.path.append(path_libs)
 import parsetables
+from col_info import ColumnInfo
 
 """
 ================================================================================
@@ -59,19 +59,25 @@ class Table():
     Attributes for a data table including import instructions and other
     metadata. Table instances are attributes of ProjectTables Class
     JDL Modified 4/8/25 refactor to fully use dImportParams and dParseParams
-        5/28/25 to add col_info attribute
+        5/28/25 to add col_info attribute; 6/4/25 add .idx
     """
     def __init__(self, name, dImportParams=None, dParseParams=None, col_info=None):
-                
-        self.name = name #Table name
+        
+        #Table name
+        self.name = name
 
-        # Dicts of import and parsing parameters
+        # Dicts of import and parse parameters
         self.dImportParams = dImportParams or {}
         self.dParseParams = dParseParams or {'parse_type':'none'}
-        self.df_raw = pd.DataFrame() # temp raw data in .lst_dfs iteration
-        self.df = pd.DataFrame()
 
-        # optionally create column info df (subset of all col_info) for this table
+        # Temp raw data in .lst_dfs iteration
+        self.df_raw = pd.DataFrame()
+
+        # Parsed data .df and list of column names (or individual column name) for indexing df
+        self.df = pd.DataFrame()
+        self.idx = []
+
+        # Optionally create Column Info df (subset of col_info.df) for this table
         self.dfColInfo = None
         if not col_info is None: self.SetTblColInfo(col_info)
 
@@ -81,14 +87,16 @@ class Table():
         self.lst_dfs = None
         self.sht_type = None
         self.is_unstructured = None
+        self.IsAddFilenameCol = None
         self.lst_dfs = None
 
     def SetTblColInfo(self, col_info):
         """
         Subset overall column info for this table
-        JDL 5/28/25
+        JDL 5/28/25; Updated 6/2/25 for readability
         """
-        self.dfColInfo = col_info.df[col_info.df['tbl_name'] == self.name].copy()
+        fil = col_info.df['tbl_name'] == self.name
+        self.dfColInfo = col_info.df[fil].copy()
         """
     ================================================================================
     ParseRawData Procedure
@@ -179,11 +187,12 @@ class Table():
         Set Table attributes for the current file 
         (concise vs referencing dict items and also factors in default vals if
         dict item not specified)
-        JDL 4/10/25
+        JDL 4/10/25; Updated 6/3/25 add IsAddFilenameCol
         """
         self.is_unstructured = self.SetParseParam(False, 'is_unstructured')
         self.n_skip_rows = self.SetParseParam(0, 'n_skip_rows')
         self.parse_type = self.SetParseParam('none', 'parse_type')
+        self.IsAddFilenameCol = self.SetParseParam(False, 'add_filename_col')
         if self.dImportParams['ftype'] == 'excel':
             self.sht_type = self.SetImportParam('single', 'sht_type')
 
@@ -247,10 +256,16 @@ class Table():
     def ReadExcelFileSheets(self):
         """
         Loop through sheets in lst_sheets and read their data
-        JDL 4/10/25
+        JDL 4/10/25; 6/3/25 add IsAddFilenameCol
         """
         for self.sht in self.lst_sheets:
             self.ReadExcelSht()
+
+            #Optionally, add filename column to rows/cols df
+            if self.IsAddFilenameCol:
+                self.df_temp['filename'] = os.path.basename(self.pf)
+                self.df_temp['sheet'] = self.sht
+
             self.lst_dfs.append(self.df_temp)
             self.df_temp = pd.DataFrame()
 
@@ -259,7 +274,6 @@ class Table():
         Read data from the current sheet into a temporary DataFrame.
         """
         if self.is_unstructured:
-            #self.df_temp = self.ImportExcelRaw()
             self.df_temp = pd.read_excel(self.pf, sheet_name=self.sht, header=None)
 
             # Negate Pandas inferring float data type for integers and NaNs for blanks
@@ -273,7 +287,7 @@ class Table():
     def ReadCSVFile(self):
         """
         Import current CSV file into a temporary df and append to lst_dfs
-        JDL 4/10/25
+        JDL 4/10/25; 6/3/25 add IsAddFilenameCol
         """
         if self.is_unstructured:
             # Read CSV without treating first row as headers
@@ -281,6 +295,13 @@ class Table():
         else:
             # Read CSV with optional skiprows
             self.df_temp = pd.read_csv(self.pf, skiprows=self.n_skip_rows)
+
+            # Strip leading/trailing whitespace from column names
+            self.df_temp.columns = self.df_temp.columns.str.strip()
+
+            #Optionally, add filename column to rows/cols df
+            if self.IsAddFilenameCol:
+                self.df_temp['filename'] = os.path.basename(self.pf)
 
         # Append temp df to lst_dfs and re-initialize
         self.lst_dfs.append(self.df_temp)
