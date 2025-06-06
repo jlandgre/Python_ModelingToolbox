@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 import pytest
 import inspect
+import datetime as dt
 
 # Import the classes to be tested
 pf_thisfile = inspect.getframeinfo(inspect.currentframe()).filename
@@ -119,6 +120,143 @@ class TestParseRawData:
             print(f'\nRaw df\n{tbls_both.Survey.lst_dfs[0]}')
             print(f'\nParsed df\n{tbls_both.Survey.df}\n\n')
             print(tbls_both.Survey.df.info(), '\n')
+
+"""
+===============================================================================
+Test Class parsefiles.ParseColMajorTbl (6/6/25)
+===============================================================================
+"""
+@pytest.fixture
+def tbls_cm(files):
+    """
+    Instance tbls and ColMajor Table
+    """
+    tbls = ProjectTables(files)
+
+    # Instance a Table with import params for test_data_parse file and parse params
+    d = {'ftype':'excel', 'sht':'Sheet1', 'import_path':files.path_data}
+    d['lst_files'] = 'col_major_test_data.xlsx'
+
+    # First two keys for completeness; not used in this test
+    d2 = {'is_unstructured':True, 
+        'parse_type':'ParseColMajorTbl',
+        'flag_start_bound': 'Total Orders',
+        'flag_end_bound': 'Total',
+        'icol_start_flag': 0,      # 'Total Orders' is in column 0
+        'icol_end_flag': 0,        # 'Total' is in column 0
+        'nrows_header_offset_from_flag': 1,   # header row is 1 row below start flag
+        'nrows_data_offset_from_flag': 2,     # data starts 2 rows below start flag
+        'nrows_data_end_offset_from_flag': -1}  # data ends at the row above 'Total'
+    
+    tbls.ColMajor = Table('ColMajor', dImportParams=d, dParseParams=d2)
+    return tbls
+
+@pytest.fixture
+def parse_cm(files, tbls_cm):
+    """
+    Import test data and instance ParseColMajorTbl class
+    JDL 6/6/25
+    """
+    # Import the test data to .lst_dfs and set .df_raw to sim iteration
+    tbls_cm.ColMajor.ImportToTblDf()
+    tbls_cm.ColMajor.df_raw = tbls_cm.ColMajor.lst_dfs[0]
+    return parsetables.ParseColMajorTbl(tbls_cm.ColMajor)
+
+class TestParseColMajorTbl:
+    def test_ParseDfRawProcedure_ColMajor(self, parse_cm):
+        """
+        Procedure to parse blocks of columns in self.df_raw and set self.df
+        JDL 6/6/25
+        """
+        parse_cm.ParseDfRawProcedure()
+        assert parse_cm.df.shape[0] == 6
+
+        if IsPrint:
+            print('\n', parse_cm.df, '\n')
+            print(parse_cm.df.info())
+
+    def test_TransferAllCols(self, parse_cm):
+        """
+        Iterate over data columns and transfer their data to self.df.
+        """
+        parse_cm.FindDataBoundaries()
+        parse_cm.SetDfCategories()
+        parse_cm.TransferAllCols()
+        assert parse_cm.df.shape[0] == 6
+        assert parse_cm.df['category'].tolist() == 3 * ['category1', 'category2']
+        assert parse_cm.df['value'].tolist() == [10, 50, 20, 60, 30, 70]
+        
+        # Set type to dates to check
+        parse_cm.df['col_header'] = parse_cm.df['col_header'].dt.date
+        expected = 2 * [dt.date(2017,9,2)] + 2 * [dt.date(2017,9,9)] + 2 * [dt.date(2017,9,16)]
+        assert parse_cm.df['col_header'].tolist() == expected
+
+    def test_ReadWriteColData(self, parse_cm):
+        """
+        Add one date column's data to self.df using self.idx_col_cur.
+        """
+        # Run precursor methods
+        parse_cm.FindDataBoundaries()
+        parse_cm.SetDfCategories()
+
+        # Set idx_col_cur to 1 (first date column in test data)
+        parse_cm.idx_col_cur = 1
+        parse_cm.ReadWriteColData()
+
+        # Check that .df has 2 rows and correct columns
+        assert parse_cm.df.shape[0] == 2
+        assert list(parse_cm.df.columns) == ['col_header', 'category', 'value']
+
+        # Check that categories and values are as expected
+        assert parse_cm.df['category'].tolist() == ['category1', 'category2']
+        assert parse_cm.df['value'].tolist() == [10, 50]
+
+    def test_SetDfCategories(self, parse_cm):
+        """
+        Set list of categories from the first column between data start and end
+        (limited by hard-coded column 0; should refactor use use dParseParams to set attribute)
+        JDL 6/6/25
+        """
+        parse_cm.FindDataBoundaries()
+        parse_cm.SetDfCategories()
+        assert parse_cm.lstCategories == ['category1', 'category2']
+        
+    def test_FindDataBoundaries(self, parse_cm):
+        """
+        Set data boundary indices for parsing using parse params and flag columns.
+        JDL 6/6/25
+        """
+        parse_cm.FindDataBoundaries()
+        assert parse_cm.idx_header_row == 4
+        assert parse_cm.idx_data_start == 5
+        assert parse_cm.idx_data_end == 6
+
+    def test_ColMajor_init(self, parse_cm, tbls_cm):
+        """
+        Parse data in columns with categories in column 0 rows
+        JDL 6/6/25
+        """
+        # Check df_raw is set and output is empty
+        assert parse_cm.df_raw is not None
+        assert parse_cm.df.empty
+
+        # Check flag and col index attributes
+        assert parse_cm.flag_start == tbls_cm.ColMajor.dParseParams['flag_start_bound']
+        assert parse_cm.flag_end == tbls_cm.ColMajor.dParseParams['flag_end_bound']
+        assert parse_cm.idx_start_flag_col == tbls_cm.ColMajor.dParseParams['icol_start_flag']
+        assert parse_cm.idx_end_flag_col == tbls_cm.ColMajor.dParseParams['icol_end_flag']
+
+        # Check row offset attributes
+        assert parse_cm.header_row_offset == tbls_cm.ColMajor.dParseParams['nrows_header_offset_from_flag']
+        assert parse_cm.data_start_row_offset == tbls_cm.ColMajor.dParseParams['nrows_data_offset_from_flag']
+        assert parse_cm.data_end_row_offset == tbls_cm.ColMajor.dParseParams['nrows_data_end_offset_from_flag']
+
+    def test_parse_cm_fixture(self, parse_cm):
+        """
+        parse_cm fixture imports the raw data and sets .df_raw
+        JDL 6/6/25
+        """
+        assert parse_cm.df_raw.shape == (8, 4)
 
 """
 ===============================================================================

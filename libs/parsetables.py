@@ -1,6 +1,107 @@
-# Version 5/30/25
+# Version 6/6/25
 import pandas as pd
 import numpy as np
+
+class ParseColMajorTbl():
+    """
+    Parse data in columns with categories in column 0 rows
+    (Format is very similar to InterleavedColBlocksTbl, but with a single col
+    per block and no block name; could modify InterleavedColBlocksTbl to detect
+    start flag instead of fixed idx_start)
+    JDL 6/6/25
+    """
+    def __init__(self, tbl):
+        # Raw DataFrame from input table
+        self.df_raw = tbl.df_raw
+
+        # Output DataFrame
+        self.df = pd.DataFrame()
+
+        # Data start and end flags and their column indices
+        self.flag_start = tbl.dParseParams['flag_start_bound']
+        self.flag_end = tbl.dParseParams['flag_end_bound']
+        self.idx_start_flag_col = tbl.dParseParams['icol_start_flag']
+        self.idx_end_flag_col = tbl.dParseParams['icol_end_flag']
+
+        # Row offsets for header and data rows from the start and end flags
+        self.header_row_offset = tbl.dParseParams['nrows_header_offset_from_flag']
+        self.data_start_row_offset = tbl.dParseParams['nrows_data_offset_from_flag']
+        self.data_end_row_offset = tbl.dParseParams['nrows_data_end_offset_from_flag']
+
+        # Data boundary indices and list of categories
+        self.idx_header_row = None
+        self.idx_data_start = None
+        self.idx_data_end = None
+        self.lstCategories = None
+
+        # Iteration variables
+        self.idx_col_cur = None
+
+    def ParseDfRawProcedure(self):
+        """
+        Procedure to parse blocks of columns in self.df_raw and set self.df
+        JDL 6/6/25
+        """
+        self.FindDataBoundaries()
+        self.SetDfCategories()
+        self.TransferAllCols()
+    
+    def FindDataBoundaries(self):
+        """
+        Set data boundary indices for parsing using parse params and flag columns.
+        JDL 6/6/25
+        """
+        # Find the row index where flag_start appears in the specified start column
+        idx_start_flag = self.df_raw[self.df_raw.iloc[:, self.idx_start_flag_col] == self.flag_start].index[0]
+
+        # Find the row index where flag_end appears in the specified end column, after start
+        end_flag_rows = self.df_raw[self.df_raw.iloc[:, self.idx_end_flag_col] == self.flag_end].index
+        end_flag_rows = end_flag_rows[end_flag_rows > idx_start_flag]
+        idx_end_flag = end_flag_rows[0]
+
+        # Set header, data start, and data end indices using row offsets from start flag
+        self.idx_header_row = idx_start_flag + self.header_row_offset
+        self.idx_data_start = idx_start_flag + self.data_start_row_offset
+        self.idx_data_end = idx_end_flag + self.data_end_row_offset
+        
+    def SetDfCategories(self):
+        """
+        Set list of categories from the first column between data start and end
+        (limited by hard-coded column 0; should refactor use use dParseParams to set attribute)
+        JDL 6/6/25
+        """
+        self.lstCategories = self.df_raw.iloc[self.idx_data_start:self.idx_data_end+1, 0].tolist()
+
+    def TransferAllCols(self):
+        """
+        Iterate over data columns and transfer their data to self.df
+        JDL 6/6/25
+        """
+        # Loop over cols; Stop if blank header cell (can happen if df_raw has trailing blank cols)
+        for self.idx_col_cur in range(1, self.df_raw.shape[1]):
+            if pd.isna(self.df_raw.iloc[self.idx_header_row, self.idx_col_cur]): break
+
+            # Read and write the column data
+            self.ReadWriteColData()
+
+    def ReadWriteColData(self):
+        """
+        Add one date column's data to self.df using self.idx_col_cur.
+        """
+        # Read the date from the header row for this column
+        header_val = self.df_raw.iloc[self.idx_header_row, self.idx_col_cur]
+
+        # Read the values for this column (orders)
+        row_slice = slice(self.idx_data_start, self.idx_data_end + 1)
+        n_orders = self.df_raw.iloc[row_slice, self.idx_col_cur].tolist()
+
+        # Build a DataFrame for this column's data
+        df_col = pd.DataFrame({'col_header': [header_val] * len(self.lstCategories),
+            'category': self.lstCategories, 'value': n_orders})
+
+        # Append column's data to self.df
+        self.df = pd.concat([self.df, df_col], ignore_index=True)
+
 """
 ================================================================================
 InterleavedColBlocksTbl Class - Data in interleaved, repeating column blocks
