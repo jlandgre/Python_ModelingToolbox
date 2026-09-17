@@ -414,11 +414,11 @@ class RowMajorBlockID:
     def SetBlockIDColValue(self, tup_block_id):
         """
         Set .df_block column from an individual block ID tuple
-        JDL 9/27/24; Modified 4/22/25 for RowMajorTbl refactor
+        JDL 9/27/24; Modified 9/17/26
         """
         # tuple consists of (block_id_name, row_offset, col_index)
-        name, row_offset, col_offset = tup_block_id[0], tup_block_id[1], tup_block_id[2]
-        idx_row, idx_col = self.idx_start_data + row_offset, tup_block_id[2]
+        name, row_offset, idx_col = tup_block_id[0], tup_block_id[1], tup_block_id[2]
+        idx_row = self.idx_start_data + row_offset
 
         # Add column with value to .df_block
         self.df_block[name] = self.df_raw.iloc[idx_row, idx_col]

@@ -17,7 +17,7 @@ from projtables import ProjectTables
 from projtables import Table
 import parsetables
 
-IsPrint = False
+IsPrint = True
 
 """
 ===============================================================================
@@ -452,6 +452,10 @@ def dParseParams_tbl1_survey():
     dParseParams['icol_end_bound'] = 0
     dParseParams['iheader_rowoffset_from_flag'] = 0
     dParseParams['idata_rowoffset_from_flag'] = 1
+
+    #Block ID variable for question text
+    dParseParams['block_id_vars'] = ('Question', -2, 0)
+
     return dParseParams
 
 @pytest.fixture
@@ -468,7 +472,7 @@ def tbl1_survey(files, dParseParams_tbl1_survey):
 @pytest.fixture
 def row_maj_tbl1_survey(tbl1_survey):
     """
-    Instance RowMajorTbl parsing class for survey data
+    Instance RowMajorTbl parsing class for one raw df in survey data
     JDL 9/25/24; Modified 5/30/25
     """
     # Simulate iteration df from .lst_dfs
@@ -487,6 +491,11 @@ class TestParseRowMajorTbl1Survey:
         (parse a raw table containing two blocks)
         JDL 9/26/24
         """
+
+        #xxx
+        print('\n', row_maj_tbl1_survey.df_raw)
+
+
         row_maj_tbl1_survey.ParseDfRawProcedure()
 
         #Check that procedure found three blocks
@@ -504,20 +513,27 @@ class TestParseRowMajorTbl1Survey:
 
         if False: print_tables(row_maj_tbl1_survey)
 
-    def xtest_survey_ParseDfRawProcedure2(self, row_maj_tbl1_survey):
+    def test_survey_ParseDfRawProcedure2(self, tbl1_survey):
         """
-        ===Move to ApplyColInfo===
         Procedure to iteratively parse row major blocks
         (parse a raw table containing two blocks)
         Stack the parsed data
         JDL 9/25/24
         """
-        row_maj_tbl1_survey.tbl.dParseParams['is_stack_parsed_cols'] = True
-        row_maj_tbl1_survey.ParseDfRawProcedure()
+        # Import raw data
+        tbl1_survey.ImportToTblDf(lst_files='tbl1_survey.xlsx')
 
-        assert len(row_maj_tbl1_survey.df) == 11
+        # Should be 1 raw df in .lst_dfs (it contains 3 blocks)
+        assert len(tbl1_survey.lst_dfs) == 1
 
-        if IsPrint: print('\n\n', row_maj_tbl1_survey.df, '\n')
+        # Parse the raw data into structured blocks
+        tbl1_survey.ParseRawData()
+
+        # Check number of rows in the parsed DataFrame
+        assert len(tbl1_survey.df) == 11
+        assert list(tbl1_survey.df.columns) == ['Question', 'Answer Choices', 'Response Percent', 'Responses', '1', '2', '3']
+
+        if IsPrint: print('\ntbl1_survey.df\n', tbl1_survey.df, '\n')
 
     def test_survey_ParseBlockProcedure1(self, row_maj_tbl1_survey):
         """
@@ -672,7 +688,7 @@ def dParseParams_tbl1():
     dParseParams['idata_rowoffset_from_flag'] = 2
 
     #Specify one item tuple to extract a block ID value from above the block
-    dParseParams['block_id_vars'] = ('stuff', -4, 2)
+    dParseParams['block_id_vars'] = ('stuff_value', -4, 2)
 
     return dParseParams
 
@@ -828,6 +844,75 @@ class TestParseRowMajorTbl1Raw:
         row_maj_tbl1.AddTrailingBlankRow()
         assert row_maj_tbl1.df_raw.shape == (14, 5)
 
+"""
+================================================================================
+RowMajorTbl Class - for parsing row major raw data
+Example with data on multiple sheets in Excel workbook
+================================================================================
+"""
+@pytest.fixture
+def dParseParams_tbl_multisheet():
+    """
+    Return a dictionary of parameters for parsing tbl1
+    JDL 9/17/26
+    """
+    dParseParams = {}
+    #dParseParams['is_unstructured'] = True
+    dParseParams['parse_type'] = 'RowMajorTbl'
+    dParseParams['import_dtype'] = str
+    #dParseParams['flag_start_bound'] = 'flag'
+    #dParseParams['flag_end_bound'] = '<blank>'
+    #dParseParams['icol_start_bound'] = 1
+    #dParseParams['icol_end_bound'] = 2
+    #dParseParams['iheader_rowoffset_from_flag'] = 1
+    #dParseParams['idata_rowoffset_from_flag'] = 2
+
+    #Specify one item tuple to extract a block ID value from above the block
+    #dParseParams['block_id_vars'] = ('stuff_value', -4, 2)
+
+    return dParseParams
+
+@pytest.fixture
+def tbl_multisheet(files, dParseParams_tbl_multisheet):
+    """
+    Table object for example data
+    JDL 9/17/26
+    """
+    # Instance Table and import data (specifying read from all sheets)
+    d = {'ftype':'excel', 'import_path':files.path_data, 'sht_type':'all'}
+    tbl = Table('tbl1', dImportParams=d, dParseParams=dParseParams_tbl_multisheet)
+    tbl.ImportToTblDf(lst_files='multisheet.xlsx')
+    return tbl
+
+"""
+================================================================================
+"""
+class TestParseRowMajorMultisheet:
+    """row_major parsing of file with data on multiple sheets"""
+
+    def test_Multisheet_ImportToTblDf(self, tbl_multisheet):
+        """
+        Test that the multi-sheet table object was created correctly and that
+        all sheets are included
+        JDL 9/17/26
+        """
+        assert tbl_multisheet.df.shape == (20,6)
+        print('\n.df\n', tbl_multisheet.df)
+
+    # def test_ParseDfRawProcedure(self, row_maj_tbl1):
+    #     """
+    #     Procedure to iteratively parse row major blocks
+    #     (parse a raw table containing one block)
+    #     JDL 9/26/24; Modified 4/21/25
+    #     """
+    #     row_maj_tbl1.ParseDfRawProcedure()
+
+    #     #Check the final state of the table
+    #     self.check_tbl1_values(row_maj_tbl1)
+
+    #     if IsPrint:
+    #         print_tables(row_maj_tbl1)
+
 class TestTbl1Fixtures:
     """RowMajorTbl parsing test fixtures"""
     
@@ -856,8 +941,10 @@ class TestTbl1Fixtures:
         """
         assert files.path_data.split(os.sep)[-3:] == ['tests', 'test_data_parse', '']
         assert files.path_libs.split(os.sep)[-2:] == ['libs', '']
-        assert files.path_root.split(os.sep)[-2:] == ['Python_ModelingToolbox', '']
+        assert files.path_root.split(os.sep)[-2:] == ['Python_Modeling_Toolbox', '']
         assert files.path_tests.split(os.sep)[-2:] == ['tests', '']
+
+
 
 """
 ================================================================================
@@ -882,8 +969,10 @@ class TestExtractBlockIDs:
 
         df_block = row_maj_tbl1.df_block
         assert len(df_block) == 5
-        assert list(df_block.columns) == ['stuff', 'idx_raw', 'col #1', 'col #2']
-        assert (df_block['stuff'] == 'Stuff in C').all()
+        assert list(df_block.columns) == ['stuff_value', 'idx_raw', 'col #1', 'col #2']
+        assert (df_block['stuff_value'] == 'Stuff in C').all()
+
+        if IsPrint: print('\ndf_block\n', df_block, '\n')
 
     def test_blockids_ExtractBlockIDsProcedure2(self, row_maj_tbl1):
         """
@@ -908,7 +997,7 @@ class TestExtractBlockIDs:
     def test_ReadBlockIDValue(self, row_maj_tbl1):
         """
         Set .df_block column from an individual block ID tuple
-        JDL 9/27/24; Rewriteen 5/30/25
+        JDL 9/27/24; Rewriteen 5/30/25; updated 9/17/26
         """
         # Run precursor ParseDfRawProcedure and ParseBlockProcedure methods
         self.create_df_block(row_maj_tbl1)
@@ -918,8 +1007,8 @@ class TestExtractBlockIDs:
 
         # use first/only block_id var for testing; check blockid.df_block
         blockid.SetBlockIDColValue(row_maj_tbl1.lst_block_ids[0])
-        assert list(blockid.df_block.columns) == ['idx_raw', 'col #1', 'col #2', 'stuff']
-        assert (blockid.df_block['stuff'] == 'Stuff in C').all()
+        assert list(blockid.df_block.columns) == ['idx_raw', 'col #1', 'col #2', 'stuff_value']
+        assert (blockid.df_block['stuff_value'] == 'Stuff in C').all()
 
     def test_RowMajorBlockID(self, row_maj_tbl1):
         """
@@ -931,13 +1020,13 @@ class TestExtractBlockIDs:
         self.check_blockid_values(blockid)
 
         # Set to single-item list
-        row_maj_tbl1.tbl.dParseParams['block_id_vars'] = [('stuff', -4, 2)]
+        row_maj_tbl1.tbl.dParseParams['block_id_vars'] = [('stuff_value', -4, 2)]
         blockid = parsetables.RowMajorBlockID(row_maj_tbl1)
         self.check_blockid_values(blockid)
 
     def check_blockid_values(self, blockid):
         assert isinstance(blockid.lst_block_ids, list)
-        assert blockid.lst_block_ids[0][0] == 'stuff'
+        assert blockid.lst_block_ids[0][0] == 'stuff_value'
         assert blockid.lst_block_ids[0][1] == -4
         assert blockid.lst_block_ids[0][2] == 2
 

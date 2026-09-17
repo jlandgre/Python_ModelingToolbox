@@ -220,6 +220,7 @@ class Table():
         (Called within iteration with self.pf file)
         JDL 4/10/25; Updated 5/30/25
         """
+        # xxx should also initialize in .__Init__ to document atts; JDL 9/16/26
         self.lst_sheets = []
 
         if self.sht_type == 'single':
