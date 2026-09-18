@@ -257,15 +257,20 @@ class Table():
     def ReadExcelFileSheets(self):
         """
         Loop through sheets in lst_sheets and read their data
-        JDL 4/10/25; 6/3/25 add IsAddFilenameCol
+        JDL 4/10/25; Modified 9/18/26
         """
         for self.sht in self.lst_sheets:
             self.ReadExcelSht()
 
-            #Optionally, add filename column to rows/cols df
+            #Optionally, add filename and sheet columns to rows/cols df
             if self.IsAddFilenameCol:
                 self.df_temp['filename'] = os.path.basename(self.pf)
                 self.df_temp['sheet'] = self.sht
+
+                # Move filename and sheet to be the first two columns
+                new_cols = ['filename', 'sheet']
+                cols = new_cols + [col for col in self.df_temp.columns if col not in new_cols]
+                self.df_temp = self.df_temp[cols]
 
             self.lst_dfs.append(self.df_temp)
             self.df_temp = pd.DataFrame()

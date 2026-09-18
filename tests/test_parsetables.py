@@ -17,7 +17,7 @@ from projtables import ProjectTables
 from projtables import Table
 import parsetables
 
-IsPrint = True
+IsPrint = False
 
 """
 ===============================================================================
@@ -100,7 +100,7 @@ class TestParseRawData:
 
         tbls_both.Survey.ParseRawData()
 
-        print('\n\n', tbls_both.Survey.df, '\n')
+        if IsPrint: print('\n\n', tbls_both.Survey.df, '\n')
 
         # Check resulting .df
         df = tbls_both.Survey.df
@@ -480,22 +480,22 @@ def row_maj_tbl1_survey(tbl1_survey):
 
     return parsetables.RowMajorTbl(tbl1_survey)
 
+@pytest.fixture
+def questions():
+    return ['Q1. How often do you wash your car?',
+            'Q2. What brands of car wash cleaner do you use',
+            'Q3. How would you improve your current product (Rank 1 to 3)']
 """
 ================================================================================
 """
 class TestParseRowMajorTbl1Survey:
     
-    def test_survey_ParseDfRawProcedure1(self, row_maj_tbl1_survey):
+    def test_survey_ParseDfRawProcedure1(self, row_maj_tbl1_survey, questions):
         """
         Procedure to iteratively parse row major blocks
         (parse a raw table containing two blocks)
-        JDL 9/26/24
+        JDL 9/26/24; modified 9/18/26
         """
-
-        #xxx
-        print('\n', row_maj_tbl1_survey.df_raw)
-
-
         row_maj_tbl1_survey.ParseDfRawProcedure()
 
         #Check that procedure found three blocks
@@ -505,13 +505,13 @@ class TestParseRowMajorTbl1Survey:
         df_check = row_maj_tbl1_survey.df
 
         if IsPrint: print('\n\n', row_maj_tbl1_survey.df, '\n')
-
-        lst_expected = ['Daily', '14.13%', '76', np.nan, np.nan, np.nan]
+        
+        lst_expected = [questions[0], 'Daily', '14.13%', '76', np.nan, np.nan, np.nan]
         check_series_values(df_check.iloc[0], lst_expected)
-        lst_expected =  ['Improved cleaning', np.nan, np.nan, '18', '11', '17']
+        lst_expected =  [questions[2], 'Improved cleaning', np.nan, np.nan, '18', '11', '17']
         check_series_values(df_check.iloc[-1], lst_expected)
 
-        if False: print_tables(row_maj_tbl1_survey)
+        if IsPrint: print('\n', row_maj_tbl1_survey.df_raw)
 
     def test_survey_ParseDfRawProcedure2(self, tbl1_survey):
         """
@@ -535,11 +535,11 @@ class TestParseRowMajorTbl1Survey:
 
         if IsPrint: print('\ntbl1_survey.df\n', tbl1_survey.df, '\n')
 
-    def test_survey_ParseBlockProcedure1(self, row_maj_tbl1_survey):
+    def test_survey_ParseBlockProcedure1(self, row_maj_tbl1_survey, questions):
         """
         Parse the survey table and check the final state of the table.
         (1st block)
-        JDL 9/25/24
+        JDL 9/25/24; Updated 9/18/26
         """
         SetListFirstStartBoundIndex(row_maj_tbl1_survey)
         row_maj_tbl1_survey.ParseBlockProcedure()
@@ -549,12 +549,12 @@ class TestParseRowMajorTbl1Survey:
 
         if IsPrint: print('\n\n', row_maj_tbl1_survey.df, '\n')
 
-        assert list(row_maj_tbl1_survey.df.iloc[0]) == ['Daily', '14.13%', '76']
-        assert list(row_maj_tbl1_survey.df.iloc[-1]) == ['Rarely', '0.37%', '2']
+        assert list(row_maj_tbl1_survey.df.iloc[0]) == [questions[0], 'Daily', '14.13%', '76']
+        assert list(row_maj_tbl1_survey.df.iloc[-1]) == [questions[0], 'Rarely', '0.37%', '2']
 
         if False: print_tables(row_maj_tbl1_survey)
 
-    def test_survey_ParseBlockProcedure2(self, row_maj_tbl1_survey):
+    def test_survey_ParseBlockProcedure2(self, row_maj_tbl1_survey, questions):
         """
         Parse the survey table and check the final state of the table.
         JDL 9/25/24; Modified 9/26/24
@@ -574,8 +574,8 @@ class TestParseRowMajorTbl1Survey:
 
         #Check resulting .df relative to tbl1_survey.xlsx
         assert len(row_maj_tbl1_survey.df) == 3
-        assert list(row_maj_tbl1_survey.df.iloc[0]) == ['Lower price point', '91', '33', '19']
-        assert list(row_maj_tbl1_survey.df.iloc[-1]) == ['Improved cleaning', '18', '11', '17']
+        assert list(row_maj_tbl1_survey.df.iloc[0]) == [questions[2], 'Lower price point', '91', '33', '19']
+        assert list(row_maj_tbl1_survey.df.iloc[-1]) == [questions[2], 'Improved cleaning', '18', '11', '17']
 
         if False: print_tables(row_maj_tbl1_survey)
 
@@ -756,7 +756,8 @@ class TestParseRowMajorTbl1Raw:
         JDL 3/4/24; Modified 4/22/25
         """
         #Check index name and column names 
-        assert list(row_maj_tbl1.df.columns) == ['stuff', 'idx_raw', 'col #1', 'col #2' ]
+        assert list(row_maj_tbl1.df.columns) == \
+            ['stuff_value', 'idx_raw', 'col #1', 'col #2' ]
 
         #Check resulting .tbl.df relative to tbl1_raw.xlsx (import raw to str dtype)
         assert len(row_maj_tbl1.df) == 5
@@ -853,35 +854,26 @@ Example with data on multiple sheets in Excel workbook
 @pytest.fixture
 def dParseParams_tbl_multisheet():
     """
-    Return a dictionary of parameters for parsing tbl1
-    JDL 9/17/26
+    Return a dictionary of parameters for parsing tbl_multisheet
+    JDL 9/18/26
     """
     dParseParams = {}
-    #dParseParams['is_unstructured'] = True
     dParseParams['parse_type'] = 'RowMajorTbl'
     dParseParams['import_dtype'] = str
-    #dParseParams['flag_start_bound'] = 'flag'
-    #dParseParams['flag_end_bound'] = '<blank>'
-    #dParseParams['icol_start_bound'] = 1
-    #dParseParams['icol_end_bound'] = 2
-    #dParseParams['iheader_rowoffset_from_flag'] = 1
-    #dParseParams['idata_rowoffset_from_flag'] = 2
 
-    #Specify one item tuple to extract a block ID value from above the block
-    #dParseParams['block_id_vars'] = ('stuff_value', -4, 2)
-
+    # Specify adding filename and sheet columns
+    dParseParams['add_filename_col'] = True
     return dParseParams
 
 @pytest.fixture
 def tbl_multisheet(files, dParseParams_tbl_multisheet):
     """
-    Table object for example data
-    JDL 9/17/26
+    Table object for multisheet case
+    JDL 9/18/26
     """
     # Instance Table and import data (specifying read from all sheets)
     d = {'ftype':'excel', 'import_path':files.path_data, 'sht_type':'all'}
     tbl = Table('tbl1', dImportParams=d, dParseParams=dParseParams_tbl_multisheet)
-    tbl.ImportToTblDf(lst_files='multisheet.xlsx')
     return tbl
 
 """
@@ -894,24 +886,17 @@ class TestParseRowMajorMultisheet:
         """
         Test that the multi-sheet table object was created correctly and that
         all sheets are included
-        JDL 9/17/26
+        JDL 9/18/26
         """
-        assert tbl_multisheet.df.shape == (20,6)
-        print('\n.df\n', tbl_multisheet.df)
+        # Since data are structured rows/cols, this creates tbl.df directly
+        tbl_multisheet.ImportToTblDf(lst_files='multisheet.xlsx')
+        assert tbl_multisheet.df.shape == (20,8)
 
-    # def test_ParseDfRawProcedure(self, row_maj_tbl1):
-    #     """
-    #     Procedure to iteratively parse row major blocks
-    #     (parse a raw table containing one block)
-    #     JDL 9/26/24; Modified 4/21/25
-    #     """
-    #     row_maj_tbl1.ParseDfRawProcedure()
+        # Check columns are present and in correct order
+        lst = ['filename', 'sheet', 'idx_raw', 'col_1', 'col_2', 'idx', 'extra_1', 'extra_2']
+        assert list(tbl_multisheet.df.columns) == lst
 
-    #     #Check the final state of the table
-    #     self.check_tbl1_values(row_maj_tbl1)
-
-    #     if IsPrint:
-    #         print_tables(row_maj_tbl1)
+        if IsPrint: print('\n.df\n', tbl_multisheet.df)
 
 class TestTbl1Fixtures:
     """RowMajorTbl parsing test fixtures"""
