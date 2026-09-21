@@ -30,18 +30,23 @@ class ColumnInfo:
     def ImportColInfoDf(self, files):
         """
         Import ColInfo.df from Excel file
-        JDL 5/28/25
+        JDL 5/28/25; updated 9/18/26
         """
-        self.df = pd.read_excel(files.pf_col_info, sheet_name='cols')
+        self.df = pd.read_excel(files.pf_col_info, sheet_name='colinfo_')
 
     def RecodeColInfoFlagCols(self):
         """
         Recode ColInfo flag columns to boolean (from imported True/NaN)
-        JDL 5/28/25
+        JDL 5/28/25; updated 9/18/26
         """
+        # Loop over rows to avoid deprecation warning with .fillna (9/18/26)
         flag_cols = ['IsCalculated']
         for col in flag_cols:
-            self.df[col] = self.df[col].fillna(False).astype(bool)
+            vals = []
+            for idx in self.df.index:
+                val = self.df.at[idx, col]
+                vals.append(bool(val) if pd.notna(val) else False)
+            self.df[col] = vals
 
     """
     =========================================================================

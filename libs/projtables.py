@@ -1,4 +1,4 @@
-#Version 6/4/25
+#Version 9/18/26
 import os, sys
 import pandas as pd
 import numpy as np
@@ -38,7 +38,7 @@ class ProjectTables():
             pass
 
         if self.UseColInfo:
-            self.col_info = ColumnInfo(files, IsInit=True, IsPrint=self.IsPrint)
+            self.cinfo = ColumnInfo(files, IsInit=True, IsPrint=self.IsPrint)
 
         #Instance project-specific tables if any
         #self.InstanceTblObjs()
@@ -50,8 +50,8 @@ class ProjectTables():
         """
         # Add project-specific table instantiations here
         # Typical is do define dImportParams and dParseParams dicts and pass as
-        # arguments to Table(name, dImportParams, dParseParams, tbls.col_info) along
-        # with optional col_info instance
+        # arguments to Table(name, dImportParams, dParseParams, tbls.cinfo) along
+        # with optional cinfo instance
         pass
 
 class Table():
@@ -59,9 +59,9 @@ class Table():
     Attributes for a data table including import instructions and other
     metadata. Table instances are attributes of ProjectTables Class
     JDL Modified 4/8/25 refactor to fully use dImportParams and dParseParams
-        5/28/25 to add col_info attribute; 6/4/25 add .idx
+        5/28/25 to add cinfo attribute; 6/4/25 add .idx
     """
-    def __init__(self, name, dImportParams=None, dParseParams=None, col_info=None):
+    def __init__(self, name, dImportParams=None, dParseParams=None, cinfo=None):
         
         #Table name
         self.name = name
@@ -77,9 +77,9 @@ class Table():
         self.df = pd.DataFrame()
         self.idx = []
 
-        # Optionally create Column Info df (subset of col_info.df) for this table
+        # Optionally create Column Info df (subset of cinfo.df) for this table
         self.dfColInfo = None
-        if not col_info is None: self.SetTblColInfo(col_info)
+        if not cinfo is None: self.SetTblColInfo(cinfo)
 
         # Temp variables for looping through files
         self.pf = None
@@ -90,13 +90,13 @@ class Table():
         self.IsAddFilenameCol = None
         self.lst_dfs = None
 
-    def SetTblColInfo(self, col_info):
+    def SetTblColInfo(self, cinfo):
         """
         Subset overall column info for this table
         JDL 5/28/25; Updated 6/2/25 for readability
         """
-        fil = col_info.df['tbl_name'] == self.name
-        self.dfColInfo = col_info.df[fil].copy()
+        fil = cinfo.df['tbl_name'] == self.name
+        self.dfColInfo = cinfo.df[fil].copy()
         """
     ================================================================================
     ParseRawData Procedure
