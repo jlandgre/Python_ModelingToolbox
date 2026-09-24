@@ -1,13 +1,12 @@
-# Version 4/21/25
-# cd Box\ Sync/Projects/Python_Col_Info/tests
+# Version 9/24/26
 import sys, os
 import pandas as pd
 import numpy as np
 import pytest
 
 # Add libs folder to sys.path and import project-specific modules
-libs_path = os.path.join(os.path.dirname(__file__), '..', 'libs')
-sys.path.insert(0, os.path.abspath(libs_path))
+src_path = os.path.join(os.path.dirname(__file__), '..', 'src')
+sys.path.insert(0, os.path.abspath(src_path))
 from projfiles import Files
 from projtables import ProjectTables
 from projtables import Table

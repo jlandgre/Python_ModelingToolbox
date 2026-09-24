@@ -93,10 +93,12 @@ class Table():
     def SetTblColInfo(self, cinfo):
         """
         Subset overall column info for this table
-        JDL 5/28/25; Updated 6/2/25 for readability
+        JDL 5/28/25; Updated 9/24/26
         """
-        fil = cinfo.df['tbl_name'] == self.name
+        # tbl colinfo is rows where tbl.name column is populated
+        fil = cinfo.df[self.name].notna()
         self.dfColInfo = cinfo.df[fil].copy()
+
         """
     ================================================================================
     ParseRawData Procedure

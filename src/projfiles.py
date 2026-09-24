@@ -1,8 +1,5 @@
-#Customized 4/3/25
-#Master Version 4/18/23 - Updated for projtables.ProjectTables instance and its inputs
+# Version 9/24/26
 #J.D. Landgrebe/Data-Delve Engineer LLC
-#Covered under MIT Open Source License (https://github.com/jlandgre/Python_Projfiles)
-
 import inspect, os
 
 class Files():
@@ -41,7 +38,7 @@ class Files():
         #Initialize Class attributes
         self.lstpaths = [] #Internal list of paths
         self.path_root = '' #Project root directory
-        self.path_libs = '' #project scripts subdirectory
+        self.path_src = '' #project scripts subdirectory
         self.path_tests = '' #tests subfolder within proj_scripts
         self.path_data = '' #project data subdirectory
         self.path_case_studies = '' #case_studies subdirectory
@@ -63,14 +60,14 @@ class Files():
     def SetGenericProjectPaths(self):
         """
         Set strings for project-specific files and paths
-        Updated 4/18/23
+        Updated 9/24/26
         """
         #Instance Project Paths and set top-level folder names and paths
         iLevels = 3
 
         self.BuildLstPaths(iLevels)
         self.path_root = self.lstpaths[1]
-        self.path_libs = self.lstpaths[0]
+        self.path_src = self.lstpaths[0]
         self.path_tests = self.path_root + 'tests' + os.sep
         self.path_case_studies = self.path_root + 'case_studies' + os.sep
 
@@ -94,8 +91,8 @@ class Files():
         self.pf_credentials = self.path_root + 'credentials.csv'
 
         # ColInfo
-        self.pf_col_info = self.path_libs + 'col_info.xlsx'
-        if self.IsTest: self.pf_col_info = self.path_data + 'col_info.xlsx'
+        self.pf_col_info = self.path_src + 'ColInfo.xlsx'
+        if self.IsTest: self.pf_col_info = self.path_data + 'ColInfo.xlsx'
 
         #Error codes file location
         self.pathfile_error_codes = self.path_data + 'ErrorCodes.xlsx'
@@ -135,7 +132,7 @@ class Files():
       print('files.path_data\n', self.path_data, '\n')
       print('files.path_case_studies\n', self.path_case_studies, '\n')
       print('files.path_home\n', self.path_home, '\n')
-      print('files.path_libs\n', self.path_libs, '\n')
+      print('files.path_src\n', self.path_src, '\n')
       if self.IsTest:
         print('files.path_tests\n', self.path_tests, '\n')
 

@@ -1,5 +1,4 @@
-#Version 5/29/25
-#python -m pytest test_parsetables.py -v -s
+# Version 9/24/26
 import sys, os
 import pandas as pd
 import numpy as np
@@ -9,8 +8,8 @@ import datetime as dt
 
 # Import the classes to be tested
 pf_thisfile = inspect.getframeinfo(inspect.currentframe()).filename
-path_libs = os.sep.join(os.path.abspath(pf_thisfile).split(os.sep)[0:-2]) + os.sep + 'libs' + os.sep
-if not path_libs in sys.path: sys.path.append(path_libs)
+path_src = os.sep.join(os.path.abspath(pf_thisfile).split(os.sep)[0:-2]) + os.sep + 'src' + os.sep
+if not path_src in sys.path: sys.path.append(path_src)
 
 from projfiles import Files
 from projtables import ProjectTables

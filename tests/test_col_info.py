@@ -1,5 +1,4 @@
-# Version 6/4/25
-# cd Box\ Sync/Projects/Python_Modeling_Toolbox/tests
+# Version 9/24/26
 import sys, os
 import pandas as pd
 import numpy as np
@@ -8,14 +7,14 @@ import datetime as dt
 from datetime import datetime
 
 # Add libs folder to sys.path and import project-specific modules
-libs_path = os.path.join(os.path.dirname(__file__), '..', 'libs')
-sys.path.insert(0, os.path.abspath(libs_path))
+src_path = os.path.join(os.path.dirname(__file__), '..', 'src')
+sys.path.insert(0, os.path.abspath(src_path))
 from col_info import ColumnInfo
 from projfiles import Files
 from projtables import ProjectTables
 from projtables import Table
 
-IsPrint = True
+IsPrint = False
 
 # files fixture
 @pytest.fixture
@@ -94,10 +93,10 @@ JDL 5/28/25
 def tbls1(files, cinfo):
     """
     cinfo fixture includes column info for ModelRaw
-    JDL 5/28/25
+    JDL 5/28/25; updated 9/24/26
     """
     tbls1 = ProjectTables(files, UseColInfo=True)
-    tbls1.ModelRaw = Table('ModelRaw', col_info=tbls1.col_info)
+    tbls1.ModelRaw = Table('ModelRaw', cinfo=tbls1.cinfo)
 
     # Example dataset with three key (index) columns and one value column
     # All strings as if imported with Table.ImportToTblDf()
@@ -115,13 +114,21 @@ Other Methods
 =========================================================================
 """
 class TestOtherMethods:
+    def test_tbls1_ModelRaw_cinfo(self, tbls1):
+        """
+        Test that tbls1.ModelRaw.dfColInfo correctly set as subset tbls1.cinfo.df
+        JDL 9/24/26
+        """
+        # Check that dfColInfo is subset of just .ModelRaw variables
+        assert tbls1.ModelRaw.dfColInfo.index.size == 5
+
     def test_SetTblIndexList(self, tbls1):
         """
         Set tbl's .idx attribute to a list of index columns
         (test_tbls1_fixture checks that tbls.ModelRaw.dfColInfo is set)
-        JDL 6/4/25
+        JDL 6/4/25; updated 9/24/26
         """
-        tbls1.col_info.SetTblIndexList(tbls1.ModelRaw)
+        tbls1.cinfo.SetTblIndexList(tbls1.ModelRaw)
         assert tbls1.ModelRaw.idx == ['date_wk_start', 'pl_abbr', 'retailer']
 
 
@@ -190,13 +197,13 @@ class TestColInfoCleanupImportedSales:
         lst = ['ABBREV', 'DUMMY', 'DATE', 'RETAILER', 'units_redeemed']
         assert tbls1.ModelRaw.df.columns.tolist() == lst
 
-        # Check tbls.col_info.df got created
-        assert tbls1.col_info.df.shape[1] == 9
-        assert tbls1.col_info.df.shape[0] >= 5
+        # Check tbls.cinfo.df got created
+        assert tbls1.cinfo.df.shape[1] == 14
+        assert tbls1.cinfo.df.shape[0] == 17
 
         # Check individual table's dfColInfo got created
         assert isinstance(tbls1.ModelRaw.dfColInfo, pd.DataFrame)
-        assert tbls1.ModelRaw.dfColInfo.shape == (5, 9)
+        assert tbls1.ModelRaw.dfColInfo.shape == (5, 14)
 
 """
 =============================================================================
@@ -216,10 +223,10 @@ def tbls2(files, cinfo):
     d = {'import_path':files.path_data, 'ftype': 'excel', 'sht':'data'}
 
     # Instance and import tables (to tbls2.Example1.df and .Example2.df)
-    tbls2.ExampleTbl1 = Table('ExampleTbl1', dImportParams=d, col_info=cinfo)
+    tbls2.ExampleTbl1 = Table('ExampleTbl1', dImportParams=d, cinfo=cinfo)
     tbls2.ExampleTbl1.ImportToTblDf(lst_files='Example1.xlsx') 
 
-    tbls2.ExampleTbl2 = Table('ExampleTbl2', dImportParams=d, col_info=cinfo)
+    tbls2.ExampleTbl2 = Table('ExampleTbl2', dImportParams=d, cinfo=cinfo)
     tbls2.ExampleTbl2.ImportToTblDf(lst_files='Example2.xlsx') 
     return tbls2
 
@@ -234,7 +241,7 @@ class TestColInfoCleanupImportedExamples:
             print(tbls2.ExampleTbl1.df.info())
             print('\n\nInitial - Before Cleanup\n\n', tbls2.ExampleTbl2.df, '\n\n')
             print(tbls2.ExampleTbl2.df.info())
-            pr
+            print('\n\n')
 
         cinfo.CleanupImportedDataProcedure(tbls2.ModelRaw)
 
@@ -284,8 +291,10 @@ class TestColInfoCleanupImportedExamples:
             cinfo.SetImportedKeepCols(tbl)
             cinfo.SetTblDataTypes(tbl)
 
-        # Check date_wk_start and units_redeemed data types for all values
+        #Column info data_type_python = 'dt.date'
         assert tbls2.ExampleTbl1.df['date1'].apply(lambda x: isinstance(x, dt.date)).all()
+
+        #Column info data_type_python = 'datetime'
         assert tbls2.ExampleTbl2.df['date2'].apply(lambda x: isinstance(x, pd.Timestamp)).all()
 
     def test_tbls2_fixture(self, tbls2):
@@ -317,9 +326,9 @@ class TestColInfoCleanupImportedExamples:
         root_folder = lst[-2]
 
         # Check libs, tests paths relative to root 
-        lst = files.path_libs.split(os.sep)
+        lst = files.path_src.split(os.sep)
         assert lst[-1] == ''
-        assert lst[-2] == 'libs'
+        assert lst[-2] == 'src'
         assert lst[-3] == root_folder
 
         lst = files.path_tests.split(os.sep)
@@ -328,5 +337,5 @@ class TestColInfoCleanupImportedExamples:
         assert lst[-3] == root_folder
 
         lst = files.pf_col_info.split(os.sep)
-        assert lst[-1] == 'col_info.xlsx'
+        assert lst[-1] == 'ColInfo.xlsx'
         assert lst[-2] == 'test_data'

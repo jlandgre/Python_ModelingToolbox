@@ -1,4 +1,4 @@
-# Version 6/4/25
+# Version 9/24/26
 import pandas as pd
 import numpy as np
 import datetime as dt
@@ -20,6 +20,7 @@ class ColumnInfo:
         if IsInit:
             self.ImportColInfoDf(files)
             self.RecodeColInfoFlagCols()
+            self.DropVBAColInfoCols()
 
         self.filTbl = None
     """
@@ -37,16 +38,25 @@ class ColumnInfo:
     def RecodeColInfoFlagCols(self):
         """
         Recode ColInfo flag columns to boolean (from imported True/NaN)
-        JDL 5/28/25; updated 9/18/26
+        JDL 5/28/25; updated 9/24/26
         """
         # Loop over rows to avoid deprecation warning with .fillna (9/18/26)
-        flag_cols = ['IsCalculated']
+        flag_cols = ['IsCalculated', 'IsIndex']
         for col in flag_cols:
             vals = []
             for idx in self.df.index:
                 val = self.df.at[idx, col]
                 vals.append(bool(val) if pd.notna(val) else False)
             self.df[col] = vals
+
+    def DropVBAColInfoCols(self):
+        """
+        Drop VBA-specific columns from ColInfo.df
+        JDL 9/24/26
+        """
+        vba_cols = ['data_type_VBA', 'FillVals', 'FilterVals']
+        for col in vba_cols:
+            if col in self.df: self.df.drop(columns=col, inplace=True)
 
     """
     =========================================================================
@@ -65,40 +75,40 @@ class ColumnInfo:
     def RenameColsRawData(self, tbl):
         """
         Rename raw data columns post-import
-        JDL 5/28/25
+        JDL 5/28/25; updated 9/24/26
         """
         # Filter for variables with raw/import name and replacement name both defined
-        fil = (~tbl.dfColInfo['cols_raw'].isna()) & (~tbl.dfColInfo['cols'].isna())
+        fil = (~tbl.dfColInfo['VarNameRaw'].isna()) & (~tbl.dfColInfo['VarNameNorm'].isna())
 
         # Use dictionary to map old column names to new ones
-        keys, vals = tbl.dfColInfo.loc[fil, 'cols_raw'], tbl.dfColInfo.loc[fil, 'cols']
+        keys, vals = tbl.dfColInfo.loc[fil, 'VarNameRaw'], tbl.dfColInfo.loc[fil, 'VarNameNorm']
         tbl.df.rename(columns=dict(zip(keys, vals)), inplace=True)
 
     def SetImportedKeepCols(self, tbl):
         """
         Subset imported columns for tbl
-        JDL 5/22/25; Updated 5/28/25
+        JDL 5/22/25; Updated 9/24/26
         """
         # Filter to (non-calculated) keep columns
-        fil = self.SetFilterColInfoPopulated(tbl, ['cols_order', 'cols'], True)
+        fil = (tbl.dfColInfo[tbl.name] > 0.) & (~tbl.dfColInfo['IsCalculated'])
 
-        # Make a sorted list of cols names and reset to those keep columns
-        lst = tbl.dfColInfo.loc[fil].sort_values('cols_order')['cols'].tolist()
+        # Make a sorted list of col names and reset to those keep columns
+        lst = tbl.dfColInfo.loc[fil].sort_values(tbl.name)['VarNameNorm'].tolist()
         tbl.df = tbl.df[lst]
 
     def SetTblDataTypes(self, tbl):
         """
-        Set data types for tbl.df columns based on self.df data_type column
-        5/22/25; Updated 5/28/25
+        Set data types for tbl.df columns based on tbl.dfColInfo data_type_python column
+        5/22/25; Updated 9/24/26
         """
         # Filter to (non-calculated) keep columns with data_type specified
-        fil = self.SetFilterColInfoPopulated(tbl, ['data_type', 'cols'], True)
+        fil = (tbl.dfColInfo[tbl.name] > 0.) & (~tbl.dfColInfo['IsCalculated'])
+        fil = fil & (~tbl.dfColInfo['data_type_python'].isna()) & (~tbl.dfColInfo['VarNameNorm'].isna())
 
-        #fil = (~tbl.dfColInfo['data_type'].isna()) & (~tbl.dfColInfo['cols'].isna())
-        df_types = tbl.dfColInfo.loc[fil, ['cols', 'data_type']]
+        df_types = tbl.dfColInfo.loc[fil, ['VarNameNorm', 'data_type_python']]
 
         # Convert column data to specified type
-        for col, data_type in zip(df_types['cols'], df_types['data_type']):
+        for col, data_type in zip(df_types['VarNameNorm'], df_types['data_type_python']):
             if data_type == 'dt.date':
                 tbl.df[col] = pd.to_datetime(tbl.df[col]).dt.date
             elif data_type == 'datetime':
@@ -116,32 +126,11 @@ class ColumnInfo:
     def SetTblIndexList(self, tbl):
         """
         Set tbl.idx to a list of index columns from tbl.dfColInfo
-        JDL 6/4/25
+        JDL 9/24/26
         """
         # Filter for columnns with and index order specified
-        fil = self.SetFilterColInfoPopulated(tbl, ['idx_order', 'cols'], True)
+        fil = tbl.dfColInfo['IsIndex']
 
-        # Get the filtered list and sort by idx_order
-        lst_index_cols = tbl.dfColInfo.loc[fil].sort_values('idx_order')['cols'].tolist()
+        # Get the filtered list based on the tbl nam column and sort by idx_order
+        lst_index_cols = tbl.dfColInfo.loc[fil].sort_values(tbl.name)['VarNameNorm'].tolist()
         tbl.idx = lst_index_cols
-
-
-    """
-    =========================================================================
-    Utility Methods
-    =========================================================================
-    """
-    def SetFilterColInfoPopulated(self, tbl, lst_cols, OmitIsCalculated=False):
-        """
-        Helper function to filter tbl.dfColInfo
-        JDL 5/28/25
-        """
-        # Filter for specified columns non-null
-        fil = tbl.dfColInfo[lst_cols].notna().all(axis=1)
-
-        # Optionally omit calculated columns
-        if OmitIsCalculated: fil = fil & (~tbl.dfColInfo['IsCalculated'])
-
-        return fil
-
-
