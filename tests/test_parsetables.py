@@ -1,6 +1,5 @@
 # Version 9/24/26
 import sys, os
-import pandas as pd
 import numpy as np
 import pytest
 import inspect
@@ -921,10 +920,10 @@ class TestTbl1Fixtures:
     def test_files(self, files):
         """
         Test that the files object was created correctly
-        JDL 9/24/24; Modified 4/21/25
+        JDL 9/24/24; Modified 9/24/26
         """
         assert files.path_data.split(os.sep)[-3:] == ['tests', 'test_data_parse', '']
-        assert files.path_libs.split(os.sep)[-2:] == ['libs', '']
+        assert files.path_src.split(os.sep)[-2:] == ['src', '']
         assert files.path_root.split(os.sep)[-2:] == ['Python_Modeling_Toolbox', '']
         assert files.path_tests.split(os.sep)[-2:] == ['tests', '']
 

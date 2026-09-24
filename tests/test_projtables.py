@@ -1,7 +1,6 @@
 # Version 9/24/26
 import sys, os
 import pandas as pd
-import numpy as np
 import pytest
 
 # Add libs folder to sys.path and import project-specific modules
@@ -61,7 +60,7 @@ class TestTableInit:
         assert len(cinfo.df) == 17
 
         # Instance ModelRaw with col_info
-        tbl = Table('ModelRaw', col_info=cinfo)
+        tbl = Table('ModelRaw', cinfo=cinfo)
         assert tbl.name == 'ModelRaw'
         assert type(tbl.dfColInfo) == pd.DataFrame
         assert len(tbl.dfColInfo) == 5
